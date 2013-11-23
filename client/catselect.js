@@ -75,14 +75,19 @@ exports.CatSelect = function () {
 		name.focus();
 	});
 
+	function attemptLogin(name) {
+		console.log('trying to login as', name);
+		exports.hideBadName();
+		exports.emit('login', name, catType, propType);
+	}
+
 	// Listen for return.
 	name.addEventListener('keydown', function (e) {
 		var nameString = name.value;
 
 		// If it's return and we have some text, login with that name.
 		if (e.keyCode === 13 && nameString.length) {
-			exports.hideBadName();
-			exports.emit('login', nameString, catType, propType);
+			attemptLogin(nameString);
 		}
 	});
 
@@ -97,10 +102,7 @@ exports.CatSelect = function () {
 			return;
 		}
 
-		exports.hideBadName();
-
-		// Login with that name.
-		exports.emit('login', nameString, catType, propType);
+		attemptLogin(nameString);
 
 		e.preventDefault();
 		e.stopPropagation();

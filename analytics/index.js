@@ -21,33 +21,22 @@
 
 var appConfig = require('../config/');
 
-var segmentio = require('analytics-node');
+var segmentio;
 
 var initialized;
 
 if (appConfig.segmentio) {
-	segmentio.init({secret: appConfig.segmentio});
-	initialized = true;
-	console.log('using segment.io');
+	try {
+		segmentio = require('analytics-node');
+		segmentio.init({secret: appConfig.segmentio});
+		initialized = true;
+		console.log('using segment.io');
+	} catch (e) {
+		console.log('error starting segment.io')
+	}
 } else {
 	console.log('segment.io not configured')
 }
-
-exports.identify = function () {
-	if (!initialized) {
-		return;
-	}
-
-	segmentio.identify.apply(null, arguments);
-};
-
-exports.track = function () {
-	if (!initialized) {
-		return;
-	}
-
-	segmentio.track.apply(null, arguments);
-};
 
 if (appConfig.newrelic) {
 	process.env.NEW_RELIC_APP_NAME = appConfig.name;
@@ -63,3 +52,27 @@ if (appConfig.newrelic) {
 } else {
 	console.log('newrelic not configured')
 }
+
+exports.identify = function () {
+	if (!initialized) {
+		return;
+	}
+
+	try {
+		segmentio.identify.apply(null, arguments);
+	} catch (e) {
+		console.log(e);
+	}
+};
+
+exports.track = function () {
+	if (!initialized) {
+		return;
+	}
+	
+	try {
+		segmentio.track.apply(null, arguments);
+	} catch (e) {
+		console.error(e);
+	}
+};

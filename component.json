@@ -1,7 +1,7 @@
 {
   "name": "scryers",
   "description": "You start with fire.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "dependencies": {
     "bjornstar/tomes": "*",
     "code42day/ga": "*",

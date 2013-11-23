@@ -43,8 +43,14 @@ var analytics = require('./analytics');
 var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
 var chatDuration = 3000;
 
-var cats = Tome.conjure({});
-var catMap = {};
+var game = {
+	turn: 0,
+	cats: {}
+};
+
+var tGame = Tome.conjure(game);
+var cats = tGame.cats
+var tSockets = Tome.conjure({});
 var merging;
 
 function nameIsOk(name) {
@@ -61,8 +67,21 @@ function nameIsOk(name) {
 	return true;
 }
 
+function msToNextTurn() {
+	return Date.now() % appConfig.msPerTurn || 1000;
+}
+
+var nextTurnTimeout;
+
+function nextTurn() {
+//	tGame.turn.inc();
+
+	sendDiffToAll();
+
+	nextTurnTimeout = setTimeout(nextTurn, msToNextTurn());
+}
+
 function rnd(n) {
-	// A handy random function.
 	return Math.floor(Math.random() * n);
 }
 
@@ -70,24 +89,18 @@ function handleSocketDisconnect() {
 	// When we get a disconnect we need to do a few things.
 	console.log(this.id + ' disconnected.');
 
-	// Remove the cat from the cat map.
-	var name = catMap[this.id].name;
-	delete catMap[this.id];
+	// Delete the socket from the map, triggering the removal of the player
+	// from the game.
 
-	// And remove the cat from cats. Thanks to the magic of tomes, this gets
-	// synchronized to all clients.
-	if (cats.hasOwnProperty(name)) {
-		cats.del(name);
-	}
-
-	analytics.track({ userId: this.id, event: 'disconnected' });
+	tSockets.del(this.id);
 }
 
 function mergeDiff(diff) {
 	console.log(this.id + ': ' + JSON.stringify(diff));
 
-	// If we got a diff from a strange socket, just ingore it.
-	if (!catMap[this.id].name) {
+	// If we got a diff from a strange socket, just ignore it.
+	if (!tSockets[this.id].name) {
+		console.log('Invalid socket:', this.id)
 		return; // has no cat.
 	}
 
@@ -98,40 +111,18 @@ function mergeDiff(diff) {
 	// Merge the diff
 	cats.merge(diff);
 
-	// Here is the perfect storm: tomes + socket.io
-
-	// We can simply broadcast the diff which sends it to all clients except
-	// for the one that sent it.
-	this.broadcast.emit('diff', diff);
-
 	// Throw away the diff since we don't want to do anything with it.
 	cats.read();
 
 	// And now we are done with merging.
 	merging = false;
+
+	// Here is the perfect storm: tomes + socket.io
+
+	// We can simply broadcast the diff which sends it to all clients except
+	// for the one that sent it.
+	this.broadcast.emit('diff', diff);
 }
-
-function sendDiffToAll() {
-	// If we are merging we will use broadcast to send the diff to all clients
-	// except for the one who sent it.
-
-	if (merging) {
-		return;
-	}
-
-	var diff = this.read();
-
-	if (diff) {
-		console.log('broadcast: '+ JSON.stringify(diff));
-
-		// More of the match made in heaven: sockets.emit sends the diff to all
-		// connected clients.
-		catsIO.sockets.emit('diff', diff);
-	}
-}
-
-// When cats change, send the diff to all clients.
-cats.on('readable', sendDiffToAll);
 
 // We want our chat message to expire after a certain amount of time so that we
 // don't have them clogging up our tubes.
@@ -153,6 +144,7 @@ function setChatExpire() {
 }
 
 function handleLogin(name, catType, propType, pos) {
+	console.log('login:', this.id, name);
 	// If the client has a bad name, tell them.
 	if (!nameIsOk(name)) {
 		return this.emit('badname');
@@ -161,8 +153,8 @@ function handleLogin(name, catType, propType, pos) {
 	// If the client is just changing their name, perform a rename. No need to
 	// set anything else up. Tomes allows us to change keys without losing
 	// references.
-	if (catMap[this.id].hasOwnProperty('name')) {
-		cats.rename(catMap[this.id].name, name);
+	if (tSockets.hasOwnProperty(this.id) && tSockets[this.id].hasOwnProperty('name')) {
+		cats.rename(tSockets[this.id].name, name);
 		return this.emit('loggedIn', name);
 	}
 
@@ -192,9 +184,14 @@ function handleLogin(name, catType, propType, pos) {
 	// of time.
 	cats[name].chat.on('add', setChatExpire);
 	
-	// Add the cat to the map with the socket.id as the key so we know which
-	// socket belongs to which cat.
-	catMap[this.id].name = name;
+	// Add the name to the map with the socket.id as the key so we know which
+	// socket belongs to which player.
+	tSockets[this.id].set('name', name);
+
+	tSockets[this.id].on('destroy', function () {
+		cats.del(name);
+		analytics.track({ userId: this.id, event: 'disconnected' });
+	});
 
 	// And tell the client who is logging in what their cat's name is.
 	this.emit('loggedIn', name);
@@ -205,15 +202,15 @@ function handleLogin(name, catType, propType, pos) {
 function clientConnect(socket) {
 	console.log(socket.id + ' connected.');
 	
-	// Register this socket in our catMap. We will set the name of their cat
-	// to indicate they are logged in.
-	catMap[socket.id] = { socket: socket };
+	// Register this socket in our socket tome. We will associate the player
+	// with the socket once they log in.
+	tSockets.set(socket.id, {});
 
-	// When a client connects, we send them a copy of the cats tome. Once they
+	// When a client connects, we send them a copy of the game tome. Once they
 	// have that, all updates are automatic.
-	socket.emit('game', cats);
+	socket.emit('game', tGame);
 
-	// On disconnect, erase the client's cat.
+	// On disconnect, clean up.
 	socket.on('disconnect', handleSocketDisconnect);
 
 	// On diff, the client sent us a change to their cat.
@@ -233,66 +230,80 @@ function isNumber (o) {
 	return false;
 }
 
-function closeServer() {
-	// Catch ctrl+c and close the socket to clean up. This is only for sockets.
-	catsServer.close();
-}
-
-function handleUncaughtException(err) {
-	// We don't want to leave the socket file laying around. Only for sockets.
-	closeServer();
-	console.log(err);
-	process.exit();
-}
-
-var catsExpress = express();
+var gameExpress = express();
 
 // Some handy express builtins.
-catsExpress.use(express.favicon());
-catsExpress.use(express.logger('dev'));
+gameExpress.use(express.favicon());
+gameExpress.use(express.logger('dev'));
 
 // See that build in there? When the client requests the index page, we build
 // the client scripts, then serve the html.
-catsExpress.get('/', build, function (req, res) {
+gameExpress.get('/', build, function (req, res) {
 	res.sendfile('./client/index.html');
 });
 
 // The built client javascript files end up here.
-catsExpress.get('/js/:js', function (req, res) {
+gameExpress.get('/js/:js', function (req, res) {
 	var js = req.params.js
 	res.sendfile('./public/' + js);
 });
 
 // CSS files served from /client/css
-catsExpress.get('/css/:css', function (req, res) {
+gameExpress.get('/css/:css', function (req, res) {
 	var css = req.params.css;
 	res.sendfile('./client/css/' + css);
 });
 
 // Images served from /client/images
-catsExpress.get('/images/:image', function (req, res) {
+gameExpress.get('/images/:image', function (req, res) {
 	var image = req.params.image;
 	res.sendfile('./client/images/' + image);
 });
 
-catsExpress.get('/audio/:audio', function (req, res) {
+gameExpress.get('/audio/:audio', function (req, res) {
 	var audio = req.params.audio;
 	res.sendfile('./client/audio/' + audio);
 });
 
 // This starts our express web server listening on either a port or a socket.
-var catsServer = catsExpress.listen(port, function () {
+var gameServer = gameExpress.listen(port, function () {
 	if (!isNumber(port)) {
+		var that = this;
 		// If it's a socket, we want to chmod it so nginx can see it and we
-		// also want to clean up the file when we exit.
+		// also want to close the port so the sock file gets cleaned up.
 		require('fs').chmod(port, parseInt('777', 8));
-		process.on('SIGINT', closeServer);
-		process.on('uncaughtException', handleUncaughtException);
+		process.on('SIGINT', that.close);
+		process.on('uncaughtException', function (error) {
+			that.close();
+			console.error(error);
+			process.exit(1);
+		});
 	}
 });
 
 // Stick socket.io on express and we're off to the races.
-var catsIO = io.listen(catsServer);
+var gameIO = io.listen(gameServer);
 
-catsIO.set('log level', 1);
-catsIO.sockets.on('connection', clientConnect);
+gameIO.set('log level', 1);
+gameIO.sockets.on('connection', clientConnect);
+
+function sendDiffToAll() {
+	// If we are merging we will use broadcast to send the diff to all clients
+	// except for the one who sent it.
+
+	if (merging) {
+		return;
+	}
+
+	var diff = tGame.readAll();
+
+	if (diff.length) {
+		console.log('broadcast: '+ JSON.stringify(diff));
+
+		// More of the match made in heaven: sockets.emit sends the diff to all
+		// connected clients.
+		gameIO.sockets.emit('diff', diff);
+	}
+}
+
+nextTurn();

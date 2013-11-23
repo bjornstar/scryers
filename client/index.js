@@ -35,7 +35,9 @@ var Tome = require('tomes').Tome;
 var socket;
 
 // These are our global variables for the game.
-var cats, me, merging, catSelect, view;
+var me, merging, catSelect, view;
+
+var tGame = Tome.conjure({});
 
 // This is our click handler.
 function handleNewCoords(newX, newY) {
@@ -45,10 +47,12 @@ function handleNewCoords(newX, newY) {
 	}
 
 	// Are you moving left or right?
-	var newD = 'r';
+	var newD = me.pos.d;
 
 	if (newX < me.pos.x) {
 		newD = 'l';
+	} else if (newX > me.pos.x) {
+		newD = 'r';
 	}
 
 	// We update our position and it gets automatically distributed to all the
@@ -92,7 +96,7 @@ function handleChatInput(e) {
 		// automatically get sent to the server so we don't have to do anything
 		// else.
 		me.chat.push(chatText);
-		
+
 		// clear the chat box.
 		this.value = '';
 		
@@ -106,8 +110,15 @@ function setupChatHooks() {
 	var chatinput = document.getElementById('chat');
 	chatinput.addEventListener('keypress', handleChatInput);
 
-	window.addEventListener('keypress', function () {
+	window.addEventListener('keypress', function (e) {
+		if (e.target === chatinput || e.ctrlKey || e.altKey) {
+			return;			
+		}
+
+		var code = e.keyCode || e.charCode;
 		chatinput.focus();
+		chatinput.value += String.fromCharCode(code);
+		e.preventDefault();
 	});
 
 	// Set keyboard focus to the chat box.
@@ -116,24 +127,31 @@ function setupChatHooks() {
 
 function handleLoggedIn(name) {
 	// You just logged in. Assign your cat to the me variable.
-	me = cats[name];
 
-	// Set up a listener for changes to our cat.
-	me.on('readable', handleMeReadable);
-	me.on('destroy', handleMeDestroy);
+	tGame.cats.on('add', function (added) {
+		if (added !== name) {
+			return;
+		}
 
-	catSelect.hide();
+		me = tGame.cats[name];
 
-	// Setup the chat box event handlers.
-	setupChatHooks();
+		// Set up a listener for changes to our cat.
+		me.on('readable', handleMeReadable);
+		me.on('destroy', handleMeDestroy);
 
-	view.setRef(me);
+		catSelect.hide();
+
+		// Setup the chat box event handlers.
+		setupChatHooks();
+
+		view.setRef(me);
+	});
 }
 
 function addCat(name) {
 	// A cat was added to the game.
 
-	var cat = cats[name];
+	var cat = tGame.cats[name];
 
 	// Add the cat to the view, the views are responsible for hooking up
 	// events.
@@ -144,25 +162,19 @@ function handleGameData(data) {
 	// When we connect to the server, the server sends us a copy of the game
 	// data.
 
-	// If we already have game data we need to destroy our copy of the data.
-	// Everything gets cleaned up automatically.
-
-	if (cats) {
-		Tome.destroy(cats);
-	}
-
-	// Conjure a new Tome to hold our game data.
-	cats = Tome.conjure(data);
+	// If we already have game data we can just assign over it and everything
+	// gets cleaned up automatically.
+	tGame.assign(data);
 
 	// Go through the list of cats in the game and add them to our playground.
-	for (var name in cats) {
-		if (cats.hasOwnProperty(name)) {
+	for (var name in tGame.cats) {
+		if (tGame.cats.hasOwnProperty(name)) {
 			addCat(name);
 		}
 	}
 
 	// And add a listener for more cats to join the party.
-	cats.on('add', addCat);
+	tGame.cats.on('add', addCat);
 }
 
 function handleDiff(diff) {
@@ -172,10 +184,10 @@ function handleDiff(diff) {
 	merging = true;
 
 	// We merge the diff into our game data.
-	cats.merge(diff);
+	tGame.merge(diff);
 
 	// And throw away the diffs generated when we merged the data.
-	cats.read();
+	tGame.read();
 
 	// And now we're done updating so we set merging to false.
 	merging = false;
