@@ -7,9 +7,20 @@ lib-cov
 *.pid
 *.gz
 
+Thumbs.db
+
+.DS_Store
+._.DS_Store
+
 pids
 logs
 results
 
+newrelic_agent.log
 npm-debug.log
-node_modules
+node_modules/
+
+components/
+public/
+
+config.json

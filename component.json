@@ -1,0 +1,21 @@
+{
+  "name": "scryers",
+  "description": "You start with fire.",
+  "version": "0.0.1",
+  "dependencies": {
+    "bjornstar/tomes": "*",
+    "code42day/ga": "*",
+    "component/emitter": "*",
+    "component/inherit": "*",
+    "component/raf": "*",
+    "component/tween": "*"
+  },
+  "scripts": [
+    "client/index.js",
+    "client/catselect.js",
+    "client/catainer.js",
+    "client/cssView.js",
+    "client/canvasView.js"
+  ],
+  "main": "client/index.js"
+}

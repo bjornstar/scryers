@@ -1,0 +1,38 @@
+{
+    "name": "scryers",
+    "description": "You start with fire.",
+    "version": "0.0.1",
+    "author": "Bjorn Stromberg <bjorn@bjornstar.com>",
+    "maintainers": [
+        { "name": "Bjorn Stromberg", "email": "bjorn@bjornstar.com" }
+    ],
+    "engines": {
+        "node": "0.10.x"
+    },
+    "main": "index.js",
+    "dependencies": {
+        "express": "*",
+        "socket.io": "*",
+        "tomes": "*",
+        "component-builder": "*",
+        "component": "*"
+    },
+    "optionalDependencies": {
+        "analytics-node": "*",
+        "newrelic": "*"
+    },
+    "scripts": {
+        "postinstall": "./node_modules/.bin/component install"
+    },
+    "license": {
+        "type": "MIT",
+        "url": "https://github.com/bjornstar/scryers/raw/master/LICENSE"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/bjornstar/scryers.git"
+    },
+    "bugs" : {
+        "url" : "http://github.com/bjornstar/scryers/issues"
+    }
+}
