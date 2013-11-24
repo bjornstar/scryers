@@ -22,5 +22,6 @@ node_modules/
 
 components/
 public/
+scryers/*
 
 config.json

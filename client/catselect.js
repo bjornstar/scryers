@@ -75,10 +75,9 @@ exports.CatSelect = function () {
 		name.focus();
 	});
 
-	function attemptLogin(name) {
-		console.log('trying to login as', name);
+	function attemptRegister(name) {
 		exports.hideBadName();
-		exports.emit('login', name, catType, propType);
+		exports.emit('register', name, catType, propType);
 	}
 
 	// Listen for return.
@@ -87,7 +86,7 @@ exports.CatSelect = function () {
 
 		// If it's return and we have some text, login with that name.
 		if (e.keyCode === 13 && nameString.length) {
-			attemptLogin(nameString);
+			attemptRegister(nameString);
 		}
 	});
 
@@ -102,7 +101,7 @@ exports.CatSelect = function () {
 			return;
 		}
 
-		attemptLogin(nameString);
+		attemptRegister(nameString);
 
 		e.preventDefault();
 		e.stopPropagation();
@@ -133,10 +132,12 @@ exports.hide = function() {
 	blocker.style.display = 'none';
 };
 
-exports.showBadName = function () {
+exports.showError = function (error) {
+	console.error(error);
+
 	// Set the loginError text
 	var loginError = document.getElementById('loginError');
-	loginError.textContent = 'Invalid name, please try a different one.';
+	loginError.textContent = error;
 
 	exports.show();
 };

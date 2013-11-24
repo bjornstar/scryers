@@ -11,11 +11,12 @@
     },
     "main": "index.js",
     "dependencies": {
-        "express": "*",
-        "socket.io": "*",
-        "tomes": ">=0.0.18",
+        "component": "*",
         "component-builder": "*",
-        "component": "*"
+        "express": "*",
+        "node-uuid": "*",
+        "socket.io": "*",
+        "tomes": ">=0.0.18"
     },
     "optionalDependencies": {
         "analytics-node": "*",

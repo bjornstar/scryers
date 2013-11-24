@@ -31,8 +31,10 @@
 var appConfig = require('./config/');
 
 var express = require('express');
+var fs = require('fs');
 var io = require('socket.io');
 var Tome = require('tomes').Tome;
+var uuid = require('node-uuid');
 
 var build = require('./build');
 var analytics = require('./analytics');
@@ -43,22 +45,14 @@ var analytics = require('./analytics');
 var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
 var chatDuration = 3000;
 
-var game = {
-	turn: 0,
-	cats: {}
-};
-
-var tGame = Tome.conjure(game);
-var cats = tGame.cats
+var tDimension = Tome.conjure({ turn: 0, scryers: {} });
+var tScryers = tDimension.scryers
 var tSockets = Tome.conjure({});
+var tGoals = Tome.conjure({});
+
 var merging;
 
 function nameIsOk(name) {
-	// Is there already a cat with that name?
-	if (cats.hasOwnProperty(name)) {
-		return false;
-	}
-
 	// Is the name empty?
 	if (name.trim() === '') {
 		return false;
@@ -74,7 +68,7 @@ function msToNextTurn() {
 var nextTurnTimeout;
 
 function nextTurn() {
-//	tGame.turn.inc();
+//	tDimension.turn.inc();
 
 	sendDiffToAll();
 
@@ -90,38 +84,32 @@ function handleSocketDisconnect() {
 	console.log(this.id + ' disconnected.');
 
 	// Delete the socket from the map, triggering the removal of the player
-	// from the game.
+	// from the dimension.
 
 	tSockets.del(this.id);
 }
 
-function mergeDiff(diff) {
-	console.log(this.id + ': ' + JSON.stringify(diff));
+function mergeGoal(diff) {
+	var socketId = this.id;
+	console.log(socketId + ': ' + JSON.stringify(diff));
 
 	// If we got a diff from a strange socket, just ignore it.
-	if (!tSockets[this.id].name) {
-		console.log('Invalid socket:', this.id)
-		return; // has no cat.
+	if (!tSockets[socketId].name) {
+		console.log('Invalid socket:', socketId)
+		return;
 	}
 
-	// Set merging to true so we know that any readable emission is from a
-	// merge.
-	merging = true;
-
 	// Merge the diff
-	cats.merge(diff);
+	tGoals.merge(diff);
 
 	// Throw away the diff since we don't want to do anything with it.
-	cats.read();
-
-	// And now we are done with merging.
-	merging = false;
+	tGoals.read();
 
 	// Here is the perfect storm: tomes + socket.io
 
 	// We can simply broadcast the diff which sends it to all clients except
 	// for the one that sent it.
-	this.broadcast.emit('diff', diff);
+	this.broadcast.emit('goal.diff', diff);
 }
 
 // We want our chat message to expire after a certain amount of time so that we
@@ -135,28 +123,73 @@ function setChatExpire() {
 		that.shift();
 	}, chatDuration);
 
-	// It's possible that our cat disconnects before the chat expires. In that
-	// case, clear the timeout so we are not modifying destroyed tomes.
+	// It's possible that our scryer disconnects before the chat expires. In
+	// tha case, clear the timeout so we are not modifying destroyed tomes.
 
 	this.on('destroy', function () {
 		clearTimeout(chatExpire);
 	});
 }
 
-function handleLogin(name, catType, propType, pos) {
-	console.log('login:', this.id, name);
-	// If the client has a bad name, tell them.
-	if (!nameIsOk(name)) {
-		return this.emit('badname');
-	}
+function handleLogin(scryerId) {
+	var socket = this;
+	var socketId = this.id;
 
-	// If the client is just changing their name, perform a rename. No need to
-	// set anything else up. Tomes allows us to change keys without losing
-	// references.
-	if (tSockets.hasOwnProperty(this.id) && tSockets[this.id].hasOwnProperty('name')) {
-		cats.rename(tSockets[this.id].name, name);
-		return this.emit('loggedIn', name);
-	}
+	console.log(socketId + ': login as', scryerId);
+
+	var scryerPath = './scryers/' + scryerId + '.json';
+
+	var loginScryer = fs.readFile(scryerPath, { encoding: 'utf8' }, function (error, data) {
+		if (error) {
+			console.log(error);
+			return socket.emit('scryerError', error);
+		}
+
+		var dataScryer;
+
+		try {
+			scryerData = JSON.parse(data);
+		} catch (e) {
+			console.log('error reading:', scryerPath )
+			return socket.emit('scryerError', e);
+		}
+
+		var goalData = {
+			pos: scryerData.pos,
+			chat: []
+		};
+
+		// Add the scryer to our scryers tome and all clients will automagically
+		// get updated at the end of this turn.
+		tScryers.set(scryerId, scryerData);
+
+		// Add the scryer to our goals, which gets updated in realtime.
+		tGoals.set(scryerId, goalData);
+
+		// When we receive a chat message, queue it up for deletion after a period
+		// of time.
+		tGoals[scryerId].chat.on('add', setChatExpire);
+		
+		// Map the scryerId to socketId so we know which socket belongs to which
+		// scryer.
+		tSockets[socketId].set('scryerId', scryerId);
+
+		tSockets[socketId].on('destroy', function () {
+			tScryers.del(scryerId);
+			tGoals.del(scryerId);
+			analytics.track({ userId: scryerId, event: 'disconnected' });
+		});
+
+		// And tell the client who is logging in what their scryerId is.
+		socket.emit('loggedIn', scryerId);
+	});
+}
+
+function handleRegister(name, catType, propType) {
+	var socket = this;
+	var socketId = this.id;
+
+	console.log(socketId + ': register as', name, catType, propType);
 
 	// Let's set some random values as defaults
 	var rndX = rnd(500) + 50;
@@ -164,39 +197,37 @@ function handleLogin(name, catType, propType, pos) {
 	var rndCat = rnd(10) + 1;
 	var rndProp = rnd(7) + 1;
 
-	// This is where your kitty is born.
-	var newCat = {
+	// This is where your scryer is born.
+	var newScryer = {
+		id: uuid.v4(),
+		name: name,
 		catType: catType || 'c' + rndCat,
 		propType: propType || 'a' + rndProp,
 		pos: {
-			x: pos ? pos.x : rndX,
-			y: pos ? pos.y : rndY,
-			d: pos ? pos.d : 'r'
+			x: rndX,
+			y: rndY,
+			d: 'r'
 		},
-		chat: []
+		registered: Date.now(),
+		lastseen: Date.now()
 	};
 
-	// Add the cat to our cats tome and all clients will automagically get
-	// updated. 
-	cats.set(name, newCat);
+	var scryerId = newScryer.id;
 
-	// When we receive a chat message, queue it up for deletion after a period
-	// of time.
-	cats[name].chat.on('add', setChatExpire);
-	
-	// Add the name to the map with the socket.id as the key so we know which
-	// socket belongs to which player.
-	tSockets[this.id].set('name', name);
+	var stringifiedScryer = JSON.stringify(newScryer, null, '\t');
 
-	tSockets[this.id].on('destroy', function () {
-		cats.del(name);
-		analytics.track({ userId: this.id, event: 'disconnected' });
+	var scryerPath = './scryers/' + scryerId + '.json';
+
+	fs.writeFile(scryerPath, stringifiedScryer, function (error) {
+		if (error) {
+			console.log(error);
+			return socket.emit('scryerError', error);
+		}
+
+		socket.emit('registered', scryerId);
+
+		analytics.identify({ userId: scryerId, traits: { name: name, catType: catType, propType: propType } });
 	});
-
-	// And tell the client who is logging in what their cat's name is.
-	this.emit('loggedIn', name);
-
-	analytics.identify({ userId: this.id, traits: { name: name } });
 }
 
 function clientConnect(socket) {
@@ -206,25 +237,30 @@ function clientConnect(socket) {
 	// with the socket once they log in.
 	tSockets.set(socket.id, {});
 
-	// When a client connects, we send them a copy of the game tome. Once they
-	// have that, all updates are automatic.
-	socket.emit('game', tGame);
+	// When a client connects, we send them a copy of the dimension. This is
+	// synchronized once per turn.
+	socket.emit('dimension', tDimension);
+
+	// We also send them the goals tome. This is synchronized in realtime and
+	// is how scryers can influence the dimension.
+	socket.emit('goals', tGoals);
 
 	// On disconnect, clean up.
 	socket.on('disconnect', handleSocketDisconnect);
 
-	// On diff, the client sent us a change to their cat.
-	socket.on('diff', mergeDiff);
+	// On diff, the client sent us a change to their goal.
+	socket.on('diff', mergeGoal);
 
 	// On login, the client is trying to login.
 	socket.on('login', handleLogin);
 
-	analytics.track({ userId: socket.id, event: 'connected' });
+	// On register, the client needs to create an account.
+	socket.on('register', handleRegister);
 }
 
 function isNumber (o) {
 	// For checking if the port is a number or a file.
-	if (parseInt(o, 10) == o) {
+	if (typeof o === 'number' || parseInt(o, 10) == o) {
 		return true;
 	}
 	return false;
@@ -295,15 +331,16 @@ function sendDiffToAll() {
 		return;
 	}
 
-	var diff = tGame.readAll();
+	var diff = tDimension.readAll();
 
 	if (diff.length) {
 		console.log('broadcast: '+ JSON.stringify(diff));
 
 		// More of the match made in heaven: sockets.emit sends the diff to all
 		// connected clients.
-		gameIO.sockets.emit('diff', diff);
+		gameIO.sockets.emit('dimension.diff', diff);
 	}
 }
 
+// Start the turnEngine.
 nextTurn();

@@ -32,40 +32,32 @@
 var Tome = require('tomes').Tome;
 
 // We include socket.io on the page.
-var socket;
+var socket = window.socket;
 
-// These are our global variables for the game.
+// These are our global variables.
 var me, merging, catSelect, view;
 
-var tGame = Tome.conjure({});
+var tDimension = Tome.conjure({});
+var tGoals = Tome.conjure({});
 
 // This is our click handler.
 function handleNewCoords(newX, newY) {
-	// Do you have a cat yet?
+	// Do you exist yet?
 	if (!me) {
 		return;
-	}
-
-	// Are you moving left or right?
-	var newD = me.pos.d;
-
-	if (newX < me.pos.x) {
-		newD = 'l';
-	} else if (newX > me.pos.x) {
-		newD = 'r';
 	}
 
 	// We update our position and it gets automatically distributed to all the
 	// other users thanks to the magic of tomes.
 
-	me.pos.assign({ x: newX, y: newY, d: newD });
+	me.pos.assign({ x: newX, y: newY });
 }
 
 function handleMeDestroy() {
-	// If we got destroyed it's because the server restarted, let's log in with
-	// our current information.
+	// If we got destroyed it's because the server restarted, let's log in
+	// again with our scryerId.
 
-	login(me.getKey(), me.catType, me.propType, me.pos);
+	login(me.getKey());
 }
 
 function handleMeReadable() {
@@ -125,15 +117,21 @@ function setupChatHooks() {
 	chatinput.focus();
 }
 
-function handleLoggedIn(name) {
+function handleRegistered(scryerId) {
+	window.localStorage.setItem('scryerId', scryerId);
+
+	login(scryerId);
+}
+
+function handleLoggedIn() {
 	// You just logged in. Assign your cat to the me variable.
 
-	tGame.cats.on('add', function (added) {
-		if (added !== name) {
+	var meListener = tGoals.on('add', function (added) {
+		if (added !== scryerId) {
 			return;
 		}
 
-		me = tGame.cats[name];
+		me = tGoals[scryerId];
 
 		// Set up a listener for changes to our cat.
 		me.on('readable', handleMeReadable);
@@ -145,64 +143,84 @@ function handleLoggedIn(name) {
 		setupChatHooks();
 
 		view.setRef(me);
+
+		// You are logged in, we can clean up the listener now.
+		tGoals.removeListener('add', meListener);
 	});
 }
 
-function addCat(name) {
-	// A cat was added to the game.
+function addScryer(scryerId) {
+	// A scryer joined our dimension.
 
-	var cat = tGame.cats[name];
+	var scryer = tDimension.scryers[scryerId];
 
 	// Add the cat to the view, the views are responsible for hooking up
 	// events.
-	view.addCat(cat);
+	view.addCat(scryer);
 }
 
-function handleGameData(data) {
-	// When we connect to the server, the server sends us a copy of the game
-	// data.
+function handleDimensionData(data) {
+	// When we connect to the server, the server sends us a copy of the
+	// dimension.
 
-	// If we already have game data we can just assign over it and everything
-	// gets cleaned up automatically.
-	tGame.assign(data);
+	// If we already have a dimension we can just assign over it and
+	// everything gets cleaned up automatically.
+	tDimension.assign(data);
 
-	// Go through the list of cats in the game and add them to our playground.
-	for (var name in tGame.cats) {
-		if (tGame.cats.hasOwnProperty(name)) {
-			addCat(name);
+	// Go through the list of scryers in the dimension and add them to our
+	// dimension.
+	for (var scryerId in tDimension.scryers) {
+		if (tDimension.scryers.hasOwnProperty(scryerId)) {
+			addScryer(scryerId);
 		}
 	}
 
-	// And add a listener for more cats to join the party.
-	tGame.cats.on('add', addCat);
+	// And add a listener for more scryers to join the party.
+	tDimension.scryers.on('add', addScryer);
 }
 
-function handleDiff(diff) {
-	// The server sends us updates to the game. We set merging to true so that
-	// we know that all events triggered are from the server.
+function handleDimensionDiff(diff) {
+	// The server sends us updates to our dimension. We cannot affect the
+	// dimension directly, we communiate our desires through our handle in the
+	// goals Tome
+
+	// We merge the diff into our dimension.
+	tDimension.merge(diff);
+
+	// And throw away the diffs generated when we merged the data.
+	tDimension.readAll();
+}
+
+function handleGoalDiff(diff) {
+	// Goals update in realtime according to the fickle whims of the scryers in
+	// our dimension. We can attempt to influence our dimension by modifying
+	// our goals here.
 
 	merging = true;
 
-	// We merge the diff into our game data.
-	tGame.merge(diff);
+	tGoals.merge(diff);
+	tGoals.readAll();
 
-	// And throw away the diffs generated when we merged the data.
-	tGame.read();
-
-	// And now we're done updating so we set merging to false.
 	merging = false;
 }
 
-function login(name, catType, propType, pos) {
-	// Send our login information to the server.
-	socket.emit('login', name, catType, propType, pos);
+function login(scryerId) {
+	socket.emit('login', scryerId);
+}
+
+function register(name, catType, propType, pos) {
+	console.log('trying to register as', name, catType, propType, pos);
+	// Register our scryer's details. The server will either emit an error. On
+	// success, the server will emit our scryerId.
+	socket.emit('register', name, catType, propType, pos);
 }
 
 function contentLoaded() {
-	// The page has loaded completely, we can start our game.
+	// The page has loaded completely, we can start.
+
 	catSelect = require('./catselect').CatSelect();
-	
-	catSelect.on('login', login);
+
+	catSelect.on('register', register);
 	
 	// Look at our URL and see if we want CSS or Canvas
 	if (window.location.href.match(/#canvas/i)) {
@@ -223,18 +241,30 @@ function contentLoaded() {
 
 	socket = io.connect();
 
-	// The server emits game with gamedata when we connect. We always sync our game
+	// The server emits dimension when we connect. We always sync our dimension
 	// to this data.
-	socket.on('game', handleGameData);
+	socket.on('dimension', handleDimensionData);
 
-	// The server emits diff with a diff whenever there are changes
-	socket.on('diff', handleDiff);
+	// The server sends us dimension diffs every turn.
+	socket.on('dimension.diff', handleDimensionDiff);
+
+	// The server sends us goal diffs in realtime.
+	socket.on('goal.diff', handleGoalDiff);
 
 	// The server emits loggedin with our name when we have succesfully logged in.
 	socket.on('loggedIn', handleLoggedIn);
 
-	// If our name is taken the server emits badname.
-	socket.on('badname', catSelect.showBadName);
+	// The server emits registered with our scryerId when we have sucessfully
+	// registered.
+	socket.on('registered', handleRegistered);
+
+	// If there is an error, show it.
+	socket.on('scryerError', catSelect.showError);
+
+	var scryerId = window.localStorage.scryerId;
+	if (scryerId) {
+		login(scryerId);
+	}
 }
 
 // Listen for the page to indicate that it's ready.
