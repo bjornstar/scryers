@@ -44,7 +44,7 @@ function Catainer(cat) {
 	var position = 'translate(' + cat.pos.x + 'px, ' + cat.pos.y + 'px)';
 	var direction = 'scaleX(' + (cat.pos.d == 'l' ? -1 : 1) + ')';
 
-	var name = cat.getKey();
+	var name = cat.name.valueOf();
 
 	var cnt = this.rootElement = document.createElement('div');
 	cnt.className = 'catainer';

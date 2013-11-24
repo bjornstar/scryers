@@ -35,8 +35,9 @@ var io = require('socket.io');
 var Tome = require('tomes').Tome;
 var uuid = require('node-uuid');
 
-var build = require('./build');
-var analytics = require('./analytics');
+var build = require('./build/');
+var analytics = require('./analytics/');
+var moveScryers = require('./lib/moveScryers')
 
 // Heroku uses PORT
 // AppFog uses VCAP_APP_PORT
@@ -65,8 +66,10 @@ function msToNextTurn() {
 
 var nextTurnTimeout;
 
+var movingScryers = {};
+
 function nextTurn() {
-//	tDimension.turn.inc();
+	moveScryers(movingScryers);
 
 	sendDiffToAll();
 
@@ -136,6 +139,15 @@ function mergeGoal(diff) {
 	this.broadcast.emit('goals.diff', diff);
 }
 
+function newGoalPos() {
+	var scryerId = this.getParent().getKey();
+	var dimPos = tDimension.scryers[scryerId].pos;
+
+	if (!this.x.is(dimPos.x) || !this.y.is(dimPos.y)) {
+		movingScryers[scryerId] = { dim: dimPos, goal: this, step: 0 };
+	}
+}
+
 // We want our chat message to expire after a certain amount of time so that we
 // don't have them clogging up our tubes.
 function setChatExpire() {
@@ -193,6 +205,8 @@ function handleLogin(scryerId) {
 		// When we receive a chat message, queue it up for deletion after a period
 		// of time.
 		tGoals[scryerId].chat.on('add', setChatExpire);
+
+		tGoals[scryerId].pos.on('readable', newGoalPos);
 		
 		// Map the scryerId to socketId so we know which socket belongs to which
 		// scryer.
