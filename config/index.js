@@ -21,6 +21,8 @@
 
 var appConfig = {};
 
+require('tome-log');
+
 try {
 	appConfig = require('../config.json');
 } catch (e) {
@@ -30,11 +32,11 @@ try {
 appConfig.name = require('../package.json').name;
 
 if (appConfig.prettyLog) {
-	console._log = console.log;
+	var log = console.log;
 	console.log = function () {
 		var args = Array.prototype.slice.call(arguments);
 		args.unshift('[' + new Date().toISOString() + '] ' + appConfig.name + '.' + process.pid + ' -');
-		console._log.apply(console, args);
+		log.apply(console, args);
 	}
 }
 

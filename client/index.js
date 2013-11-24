@@ -28,6 +28,8 @@
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
 
+require('tome-log');
+
 // We can require Tomes thanks to component.
 var Tome = require('tomes').Tome;
 
@@ -35,29 +37,36 @@ var Tome = require('tomes').Tome;
 var socket = window.socket;
 
 // These are our global variables.
-var me, merging, catSelect, view;
+var merging, catSelect, view;
+
+var myScryerId = window.localStorage.getItem('scryerId');
+var myGoals;
 
 var tDimension = Tome.conjure({});
 var tGoals = Tome.conjure({});
-
+window.dimension = tDimension;
+window.goals = tGoals;
 // This is our click handler.
 function handleNewCoords(newX, newY) {
 	// Do you exist yet?
-	if (!me) {
+	if (!myGoals) {
 		return;
 	}
 
 	// We update our position and it gets automatically distributed to all the
 	// other users thanks to the magic of tomes.
 
-	me.pos.assign({ x: newX, y: newY });
+	myGoals.pos.x.assign(newX);
+	myGoals.pos.y.assign(newY);
 }
 
 function handleMeDestroy() {
 	// If we got destroyed it's because the server restarted, let's log in
 	// again with our scryerId.
 
-	login(me.getKey());
+	console.log('I was destroyed.');
+
+	login();
 }
 
 function handleMeReadable() {
@@ -72,7 +81,7 @@ function handleMeReadable() {
 	}
 
 	// Get the changes
-	var diff = me.read();
+	var diff = this.read();
 
 	if (diff) {
 		// Send them to the server.
@@ -87,7 +96,7 @@ function handleChatInput(e) {
 		// Push the text onto our chat object. Remember, any changes we make
 		// automatically get sent to the server so we don't have to do anything
 		// else.
-		me.chat.push(chatText);
+		myGoals.chat.push(chatText);
 
 		// clear the chat box.
 		this.value = '';
@@ -119,35 +128,35 @@ function setupChatHooks() {
 
 function handleRegistered(scryerId) {
 	window.localStorage.setItem('scryerId', scryerId);
+	myScryerId = scryerId;
 
-	login(scryerId);
+	login();
 }
 
-function handleLoggedIn() {
-	// You just logged in. Assign your cat to the me variable.
+function finishLogin() {
+	myGoals = tGoals[myScryerId];
 
-	var meListener = tGoals.on('add', function (added) {
-		if (added !== scryerId) {
-			return;
-		}
+	// Set up a listener for changes to our goals.
+	myGoals.on('readable', handleMeReadable);
+	myGoals.on('destroy', handleMeDestroy);
 
-		me = tGoals[scryerId];
+	catSelect.hide();
 
-		// Set up a listener for changes to our cat.
-		me.on('readable', handleMeReadable);
-		me.on('destroy', handleMeDestroy);
+	// Setup the chat box event handlers.
+	setupChatHooks();
 
-		catSelect.hide();
-
-		// Setup the chat box event handlers.
-		setupChatHooks();
-
-		view.setRef(me);
-
-		// You are logged in, we can clean up the listener now.
-		tGoals.removeListener('add', meListener);
-	});
+	view.setRef(myGoals);
 }
+
+var loginWatcher = tGoals.on('add', function (id) {
+	if (id !== myScryerId) {
+		return;
+	}
+
+	tGoals.removeListener('add', loginWatcher);
+
+	finishLogin();
+});
 
 function addScryer(scryerId) {
 	// A scryer joined our dimension.
@@ -162,7 +171,7 @@ function addScryer(scryerId) {
 function handleDimensionData(data) {
 	// When we connect to the server, the server sends us a copy of the
 	// dimension.
-
+console.log('got dimension:', data);
 	// If we already have a dimension we can just assign over it and
 	// everything gets cleaned up automatically.
 	tDimension.assign(data);
@@ -179,11 +188,16 @@ function handleDimensionData(data) {
 	tDimension.scryers.on('add', addScryer);
 }
 
+function handleGoalData(data) {
+	console.log('got goals:', data);
+	tGoals.assign(data);
+}
+
 function handleDimensionDiff(diff) {
 	// The server sends us updates to our dimension. We cannot affect the
 	// dimension directly, we communiate our desires through our handle in the
 	// goals Tome
-
+console.log('got dimension diff:', diff);
 	// We merge the diff into our dimension.
 	tDimension.merge(diff);
 
@@ -191,11 +205,11 @@ function handleDimensionDiff(diff) {
 	tDimension.readAll();
 }
 
-function handleGoalDiff(diff) {
+function handleGoalsDiff(diff) {
 	// Goals update in realtime according to the fickle whims of the scryers in
 	// our dimension. We can attempt to influence our dimension by modifying
 	// our goals here.
-
+console.log('got goals diff:', diff);
 	merging = true;
 
 	tGoals.merge(diff);
@@ -204,14 +218,15 @@ function handleGoalDiff(diff) {
 	merging = false;
 }
 
-function login(scryerId) {
-	socket.emit('login', scryerId);
+function login() {
+	console.log('emitting login:', myScryerId);
+	socket.emit('login', myScryerId);
 }
 
 function register(name, catType, propType, pos) {
-	console.log('trying to register as', name, catType, propType, pos);
 	// Register our scryer's details. The server will either emit an error. On
 	// success, the server will emit our scryerId.
+console.log('emitting register:', name, catType, propType, pos);
 	socket.emit('register', name, catType, propType, pos);
 }
 
@@ -245,14 +260,13 @@ function contentLoaded() {
 	// to this data.
 	socket.on('dimension', handleDimensionData);
 
+	socket.on('goals', handleGoalData);
+
 	// The server sends us dimension diffs every turn.
 	socket.on('dimension.diff', handleDimensionDiff);
 
-	// The server sends us goal diffs in realtime.
-	socket.on('goal.diff', handleGoalDiff);
-
-	// The server emits loggedin with our name when we have succesfully logged in.
-	socket.on('loggedIn', handleLoggedIn);
+	// The server sends us goals diffs in realtime.
+	socket.on('goals.diff', handleGoalsDiff);
 
 	// The server emits registered with our scryerId when we have sucessfully
 	// registered.
@@ -261,9 +275,10 @@ function contentLoaded() {
 	// If there is an error, show it.
 	socket.on('scryerError', catSelect.showError);
 
-	var scryerId = window.localStorage.scryerId;
-	if (scryerId) {
-		login(scryerId);
+	if (myScryerId) {
+		login();
+	} else {
+		console.log('no scryerId, you should register.');
 	}
 }
 

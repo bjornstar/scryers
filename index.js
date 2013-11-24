@@ -27,7 +27,6 @@
 //  _____| ||     |_ |   |  | |  |   |  |   |___ |   |  | | _____| |
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
-
 var appConfig = require('./config/');
 
 var express = require('express');
@@ -46,7 +45,6 @@ var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
 var chatDuration = 3000;
 
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
-var tScryers = tDimension.scryers
 var tSockets = Tome.conjure({});
 var tGoals = Tome.conjure({});
 
@@ -80,24 +78,48 @@ function rnd(n) {
 }
 
 function handleSocketDisconnect() {
-	// When we get a disconnect we need to do a few things.
-	console.log(this.id + ' disconnected.');
+	var socketId = this.id;
+
+	console.log(socketId + ' disconnected.');
 
 	// Delete the socket from the map, triggering the removal of the player
 	// from the dimension.
 
-	tSockets.del(this.id);
+	tSockets.del(socketId);
 }
+
+function handleGoalsReadable() {
+	// If we are merging we will use broadcast to send the diff to all clients
+	// except for the one who sent it.
+
+	if (merging) {
+		return;
+	}
+
+	var diff = tGoals.readAll();
+
+	if (diff.length) {
+		console.log('goals.diff.broadcast: '+ JSON.stringify(diff));
+
+		// More of the match made in heaven: sockets.emit sends the diff to all
+		// connected clients.
+		gameIO.sockets.emit('goals.diff', diff);
+	}
+}
+
+tGoals.on('readable', handleGoalsReadable);
 
 function mergeGoal(diff) {
 	var socketId = this.id;
 	console.log(socketId + ': ' + JSON.stringify(diff));
 
 	// If we got a diff from a strange socket, just ignore it.
-	if (!tSockets[socketId].name) {
+	if (!tSockets[socketId].scryerId) {
 		console.log('Invalid socket:', socketId)
 		return;
 	}
+
+	merging = true;
 
 	// Merge the diff
 	tGoals.merge(diff);
@@ -105,11 +127,13 @@ function mergeGoal(diff) {
 	// Throw away the diff since we don't want to do anything with it.
 	tGoals.read();
 
+	merging = false;
+
 	// Here is the perfect storm: tomes + socket.io
 
 	// We can simply broadcast the diff which sends it to all clients except
 	// for the one that sent it.
-	this.broadcast.emit('goal.diff', diff);
+	this.broadcast.emit('goals.diff', diff);
 }
 
 // We want our chat message to expire after a certain amount of time so that we
@@ -139,7 +163,7 @@ function handleLogin(scryerId) {
 
 	var scryerPath = './scryers/' + scryerId + '.json';
 
-	var loginScryer = fs.readFile(scryerPath, { encoding: 'utf8' }, function (error, data) {
+	fs.readFile(scryerPath, { encoding: 'utf8' }, function (error, data) {
 		if (error) {
 			console.log(error);
 			return socket.emit('scryerError', error);
@@ -161,7 +185,7 @@ function handleLogin(scryerId) {
 
 		// Add the scryer to our scryers tome and all clients will automagically
 		// get updated at the end of this turn.
-		tScryers.set(scryerId, scryerData);
+		tDimension.scryers.set(scryerId, scryerData);
 
 		// Add the scryer to our goals, which gets updated in realtime.
 		tGoals.set(scryerId, goalData);
@@ -175,7 +199,8 @@ function handleLogin(scryerId) {
 		tSockets[socketId].set('scryerId', scryerId);
 
 		tSockets[socketId].on('destroy', function () {
-			tScryers.del(scryerId);
+			console.log(socketId, 'disconnected. deleting', scryerId, '.');
+			tDimension.scryers.del(scryerId);
 			tGoals.del(scryerId);
 			analytics.track({ userId: scryerId, event: 'disconnected' });
 		});
@@ -334,7 +359,7 @@ function sendDiffToAll() {
 	var diff = tDimension.readAll();
 
 	if (diff.length) {
-		console.log('broadcast: '+ JSON.stringify(diff));
+		console.log('dimension.diff.broadcast: '+ JSON.stringify(diff));
 
 		// More of the match made in heaven: sockets.emit sends the diff to all
 		// connected clients.

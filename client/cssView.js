@@ -74,6 +74,7 @@ CssView.prototype.addCat = function (cat) {
 		myCatainer.destroy();
 	});
 
+/*
 	cat.chat.on('add', function (index) {
 		var chatText = this[index];
 		
@@ -87,6 +88,7 @@ CssView.prototype.addCat = function (cat) {
 			myCatainer.destroyChat(chatDiv);
 		});
 	});
+*/
 };
 
 CssView.prototype.remove = function (element) {
