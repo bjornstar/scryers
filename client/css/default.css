@@ -59,9 +59,10 @@ div.catainer {
   width: 0;
   height: 0;
   opacity: 0;
-  -webkit-transition: -webkit-transform 1s, opacity 1s;
-  -moz-transition: -moz-transform 1s, opacity 1s;
-  -ms-transition: -ms-transform 1s, opacity 1s;
+  -webkit-transition: -webkit-transform 1s linear, opacity 1s;
+  -moz-transition: -moz-transform 1s linear, opacity 1s;
+  -ms-transition: -ms-transform 1s linear, opacity 1s;
+  -o-transition: -o-transform 1s linear, opacity 1s;
 }
 
 div.cat {
@@ -90,6 +91,7 @@ div.nametag {
   -webkit-transform: translateX(-50%);
   -moz-transform: translateX(-50%);
   -ms-transform: translateX(-50%);
+  -o-transform: translateX(-50%);
   min-width: 300px;
   text-align: center;
 }
@@ -110,6 +112,7 @@ div.chatList div {
   -webkit-transition: opacity 1s;
   -moz-transition: opacity 1s;
   -ms-transition: opacity 1s;
+  -o-transition: opacity 1s;
   opacity: 0;
   border-radius: 9.3px;
 }

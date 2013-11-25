@@ -37,7 +37,7 @@ var uuid = require('node-uuid');
 
 var build = require('./build/');
 var analytics = require('./analytics/');
-var moveScryers = require('./lib/moveScryers')
+var move = require('./lib/move')
 
 // Heroku uses PORT
 // AppFog uses VCAP_APP_PORT
@@ -69,7 +69,7 @@ var nextTurnTimeout;
 var movingScryers = {};
 
 function nextTurn() {
-	moveScryers(movingScryers);
+	move(movingScryers);
 
 	sendDiffToAll();
 
@@ -141,10 +141,10 @@ function mergeGoal(diff) {
 
 function newGoalPos() {
 	var scryerId = this.getParent().getKey();
-	var dimPos = tDimension.scryers[scryerId].pos;
+	var scryer = tDimension.scryers[scryerId];
 
-	if (!this.x.is(dimPos.x) || !this.y.is(dimPos.y)) {
-		movingScryers[scryerId] = { dim: dimPos, goal: this, step: 0 };
+	if (!this.x.is(scryer.pos.x) || !this.y.is(scryer.pos.y)) {
+		movingScryers[scryerId] = { dim: scryer.pos, goal: this, speed: scryer.speed };
 	}
 }
 

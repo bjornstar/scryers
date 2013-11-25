@@ -30,23 +30,29 @@ function transform(what, how) {
 	what.style.transform = how;
 	what.style.webkitTransform = how;
 	what.style.msTransform = how;
+	what.style.oTransform = how;
 }
 
 function onEnd(what, then) {
 	what.addEventListener('transitionEnd', then);
 	what.addEventListener('webkitTransitionEnd', then);
 	what.addEventListener('msTransitionEnd', then);
+	what.addEventListener('oTransitionEnd', then);
 }
 
 function Catainer(cat) {
 	this.cat = cat;
 
-	var position = 'translate(' + cat.pos.x + 'px, ' + cat.pos.y + 'px)';
+	this.x = cat.pos.x.valueOf();
+	this.y = cat.pos.y.valueOf();
+
+	var position = 'translate(' + this.x + 'px, ' + this.y + 'px)';
 	var direction = 'scaleX(' + (cat.pos.d == 'l' ? -1 : 1) + ')';
 
 	var name = cat.name.valueOf();
 
 	var cnt = this.rootElement = document.createElement('div');
+	cnt.id = cat.getKey();
 	cnt.className = 'catainer';
 	transform(cnt, position);
 
@@ -91,6 +97,11 @@ function Catainer(cat) {
 }
 
 Catainer.prototype.update = function () {
+	var distanceX = Math.abs(this.x - this.cat.pos.x);
+	var distanceY = Math.abs(this.y - this.cat.pos.y);
+
+	console.log(distanceX, distanceY, Math.sqrt(Math.pow(distanceX, 2) + Math.pow(distanceY, 2)));
+
 	var movement = 'translate(' + this.cat.pos.x + 'px, ' + this.cat.pos.y + 'px)';
 	var direction = 'scaleX(' + (this.cat.pos.d == 'l' ? -1 : 1) + ')';
 
@@ -108,6 +119,9 @@ Catainer.prototype.update = function () {
 	// them too.
 
 	transform(this.prop, direction);
+
+	this.x = this.cat.pos.x.valueOf();
+	this.y = this.cat.pos.y.valueOf();
 };
 
 Catainer.prototype.destroy = function () {
