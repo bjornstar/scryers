@@ -213,6 +213,8 @@ function loadScryer(scryerId, callback) {
 }
 
 function logout(scryerId) {
+	tDimension.scryers[scryerId].set('lastlogout', Date.now());
+
 	saveScryer(scryerId, tDimension.scryers[scryerId], function(error) {
 		if (error) {
 			console.log('error saving:', scryerId, error)
@@ -241,6 +243,9 @@ function handleLogin(scryerId) {
 			pos: scryerData.pos,
 			chat: []
 		};
+
+		// Sneakily bump the lastseen before it gets turned into a tome.
+		scryerData.lastlogin = Date.now();
 
 		// Add the scryer to our scryers tome and all clients will automagically
 		// get updated at the end of this turn.
@@ -293,7 +298,7 @@ function handleRegister(name, catType, propType) {
 			d: 'r'
 		},
 		registered: Date.now(),
-		lastseen: Date.now()
+		lastlogin: Date.now()
 	};
 
 	var scryerId = newScryer.id;
