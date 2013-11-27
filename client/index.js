@@ -44,8 +44,10 @@ var myGoals;
 
 var tDimension = Tome.conjure({});
 var tGoals = Tome.conjure({});
+
 window.dimension = tDimension;
 window.goals = tGoals;
+
 // This is our click handler.
 function handleNewCoords(newX, newY) {
 	// Do you exist yet?
@@ -148,16 +150,6 @@ function finishLogin() {
 	view.setRef(myGoals);
 }
 
-var loginWatcher = tGoals.on('add', function (id) {
-	if (id !== myScryerId) {
-		return;
-	}
-
-	tGoals.removeListener('add', loginWatcher);
-
-	finishLogin();
-});
-
 function addScryer(scryerId) {
 	// A scryer joined our dimension.
 
@@ -171,7 +163,7 @@ function addScryer(scryerId) {
 function handleDimensionData(data) {
 	// When we connect to the server, the server sends us a copy of the
 	// dimension.
-console.log('got dimension:', data);
+	console.log('got dimension:', data);
 	// If we already have a dimension we can just assign over it and
 	// everything gets cleaned up automatically.
 	tDimension.assign(data);
@@ -188,6 +180,15 @@ console.log('got dimension:', data);
 	tDimension.scryers.on('add', addScryer);
 }
 
+var loginWatcher = tGoals.on('add', function (id) {
+	if (id !== myScryerId) {
+		return;
+	}
+
+	finishLogin();
+});
+
+
 function handleGoalData(data) {
 	console.log('got goals:', data);
 	tGoals.assign(data);
@@ -197,7 +198,7 @@ function handleDimensionDiff(diff) {
 	// The server sends us updates to our dimension. We cannot affect the
 	// dimension directly, we communiate our desires through our handle in the
 	// goals Tome
-console.log('got dimension diff:', diff);
+	console.log('got dimension diff:', diff);
 	// We merge the diff into our dimension.
 	tDimension.merge(diff);
 
@@ -209,7 +210,7 @@ function handleGoalsDiff(diff) {
 	// Goals update in realtime according to the fickle whims of the scryers in
 	// our dimension. We can attempt to influence our dimension by modifying
 	// our goals here.
-console.log('got goals diff:', diff);
+	console.log('got goals diff:', diff);
 	merging = true;
 
 	tGoals.merge(diff);
@@ -226,7 +227,7 @@ function login() {
 function register(name, catType, propType, pos) {
 	// Register our scryer's details. The server will either emit an error. On
 	// success, the server will emit our scryerId.
-console.log('emitting register:', name, catType, propType, pos);
+	console.log('emitting register:', name, catType, propType, pos);
 	socket.emit('register', name, catType, propType, pos);
 }
 

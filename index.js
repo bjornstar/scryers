@@ -145,6 +145,12 @@ function newGoalPos() {
 
 	if (!this.x.is(scryer.pos.x) || !this.y.is(scryer.pos.y)) {
 		movingScryers[scryerId] = { dim: scryer.pos, goal: this, speed: scryer.speed };
+
+		// If our scryer gets deleted while it's moving, we need to remove it
+		// from the moving list.
+		scryer.on('destroy', function () {
+			delete movingScryers[scryerId];
+		});
 	}
 }
 
@@ -167,27 +173,68 @@ function setChatExpire() {
 	});
 }
 
+function getScryerPath(scryerId) {
+	return './scryers/' + scryerId + '.json';
+}
+
+function saveScryer(scryerId, scryer, callback) {
+	var scryerPath = getScryerPath(scryerId);
+
+	var out = JSON.stringify(scryer, null, '\t');
+
+	fs.writeFile(scryerPath, out, { encoding: 'utf8' }, function (error) {
+		if (error) {
+			return callback(error);
+		}
+
+		callback();
+	});
+}
+
+function loadScryer(scryerId, callback) {
+	var scryerPath = getScryerPath(scryerId);
+
+	fs.readFile(scryerPath, { encoding: 'utf8' }, function (error, data) {
+		if (error) {
+			return callback(error);
+		}
+
+		var scryer;
+
+		try {
+			scryer = JSON.parse(data);
+		} catch (e) {
+			console.log('error reading:', scryerPath )
+			return callback(error);
+		}
+
+		callback(null, scryer);
+	});
+}
+
+function logout(scryerId) {
+	saveScryer(scryerId, tDimension.scryers[scryerId], function(error) {
+		if (error) {
+			console.log('error saving:', scryerId, error)
+		}
+
+		tDimension.scryers.del(scryerId);
+		tGoals.del(scryerId);
+
+		analytics.track({ userId: scryerId, event: 'disconnected' });
+	});
+}
+
 function handleLogin(scryerId) {
 	var socket = this;
 	var socketId = this.id;
 
 	console.log(socketId + ': login as', scryerId);
 
-	var scryerPath = './scryers/' + scryerId + '.json';
-
-	fs.readFile(scryerPath, { encoding: 'utf8' }, function (error, data) {
+	loadScryer(scryerId, function (error, scryerData) {
 		if (error) {
-			console.log(error);
+			console.log('error: ', error);
 			return socket.emit('scryerError', error);
-		}
-
-		var dataScryer;
-
-		try {
-			scryerData = JSON.parse(data);
-		} catch (e) {
-			console.log('error reading:', scryerPath )
-			return socket.emit('scryerError', e);
 		}
 
 		var goalData = {
@@ -213,10 +260,8 @@ function handleLogin(scryerId) {
 		tSockets[socketId].set('scryerId', scryerId);
 
 		tSockets[socketId].on('destroy', function () {
-			console.log(socketId, 'disconnected. deleting', scryerId, '.');
-			tDimension.scryers.del(scryerId);
-			tGoals.del(scryerId);
-			analytics.track({ userId: scryerId, event: 'disconnected' });
+			console.log(socketId, 'disconnected. logging out', scryerId, '.');
+			logout(scryerId);
 		});
 
 		// And tell the client who is logging in what their scryerId is.
@@ -253,13 +298,9 @@ function handleRegister(name, catType, propType) {
 
 	var scryerId = newScryer.id;
 
-	var stringifiedScryer = JSON.stringify(newScryer, null, '\t');
-
-	var scryerPath = './scryers/' + scryerId + '.json';
-
-	fs.writeFile(scryerPath, stringifiedScryer, function (error) {
+	saveScryer(scryerId, newScryer, function (error) {
 		if (error) {
-			console.log(error);
+			console.log('error saving new scryer', error);
 			return socket.emit('scryerError', error);
 		}
 
