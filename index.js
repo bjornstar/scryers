@@ -27,14 +27,14 @@
 //  _____| ||     |_ |   |  | |  |   |  |   |___ |   |  | | _____| |
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
-var appConfig = require('./config/');
+var fs = require('fs');
 
 var express = require('express');
-var fs = require('fs');
-var io = require('socket.io');
 var Tome = require('tomes').Tome;
 var uuid = require('node-uuid');
+var WebSocketServer = require('ws').Server;
 
+var appConfig = require('./config/');
 var build = require('./build/');
 var analytics = require('./analytics/');
 var move = require('./lib/move')
@@ -46,7 +46,6 @@ var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
 var chatDuration = 3000;
 
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
-var tSockets = Tome.conjure({});
 var tGoals = Tome.conjure({});
 
 var merging;
@@ -315,29 +314,46 @@ function handleRegister(name, catType, propType) {
 	});
 }
 
+function parseData(data) {
+	var colonIndex = data.indexOf(':');
+	var n = data.substring(0, colonIndex);
+	var d = JSON.parse(data.substring(colonIndex + 1));
+	return { name: n, data: d };
+}
+
+var eventHandlers = {
+	login: handleLogin
+}
+
+function handleMessage(data) {
+	var evt = parseData(data);
+	eventHandlers[evt.name](evt.data);
+}
+
+var connectedSockets = [];
+
 function clientConnect(socket) {
-	console.log(socket.id + ' connected.');
-	
-	// Register this socket in our socket tome. We will associate the player
-	// with the socket once they log in.
-	tSockets.set(socket.id, {});
+	// Remember this socket. We will associate the playe with the socket once
+	// they log in.
+
+	connectedSockets.push(socket);
 
 	// When a client connects, we send them a copy of the dimension. This is
 	// synchronized once per turn.
-	socket.emit('dimension', tDimension);
+	socket.send('dimension:' + JSON.stringify(tDimension));
 
 	// We also send them the goals tome. This is synchronized in realtime and
 	// is how scryers can influence the dimension.
-	socket.emit('goals', tGoals);
+	socket.send('goals:' + JSON.stringify(tGoals));
 
 	// On disconnect, clean up.
-	socket.on('disconnect', handleSocketDisconnect);
+	socket.on('close', handleSocketDisconnect);
 
 	// On diff, the client sent us a change to their goal.
 	socket.on('diff', mergeGoal);
 
 	// On login, the client is trying to login.
-	socket.on('login', handleLogin);
+	socket.on('message', handleMessage);
 
 	// On register, the client needs to create an account.
 	socket.on('register', handleRegister);
@@ -355,7 +371,7 @@ var gameExpress = express();
 
 // Some handy express builtins.
 gameExpress.use(express.favicon());
-gameExpress.use(express.logger('dev'));
+//gameExpress.use(express.logger('dev'));
 
 // See that build in there? When the client requests the index page, we build
 // the client scripts, then serve the html.
@@ -402,11 +418,9 @@ var gameServer = gameExpress.listen(port, function () {
 	}
 });
 
-// Stick socket.io on express and we're off to the races.
-var gameIO = io.listen(gameServer);
 
-gameIO.set('log level', 1);
-gameIO.sockets.on('connection', clientConnect);
+var wss = new WebSocketServer({ port: 3001 });
+wss.on('connection', clientConnect);
 
 function sendDiffToAll() {
 	// If we are merging we will use broadcast to send the diff to all clients

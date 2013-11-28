@@ -33,9 +33,6 @@ require('tome-log');
 // We can require Tomes thanks to component.
 var Tome = require('tomes').Tome;
 
-// We include socket.io on the page.
-var socket = window.socket;
-
 // These are our global variables.
 var merging, catSelect, view;
 
@@ -47,6 +44,28 @@ var tGoals = Tome.conjure({});
 
 window.dimension = tDimension;
 window.goals = tGoals;
+
+var ws = new WebSocket(window.config.wsurl);
+
+function handleOpen() {
+	console.log('The portal is opening...');
+	if (myScryerId) {
+		login();
+	} else {
+		console.log('I have not seen you before.');
+	}
+}
+
+ws.onopen = handleOpen;
+
+function l(something) {
+	console.log(something);
+}
+
+var socket = {
+	on: l,
+	emit: l
+};
 
 // This is our click handler.
 function handleNewCoords(newX, newY) {
@@ -220,8 +239,8 @@ function handleGoalsDiff(diff) {
 }
 
 function login() {
-	console.log('emitting login:', myScryerId);
-	socket.emit('login', myScryerId);
+	console.log('sending login:' + myScryerId);
+	ws.send('login:' + JSON.stringify(myScryerId));
 }
 
 function register(name, catType, propType, pos) {
@@ -230,6 +249,22 @@ function register(name, catType, propType, pos) {
 	console.log('emitting register:', name, catType, propType, pos);
 	socket.emit('register', name, catType, propType, pos);
 }
+
+function parseData(data) {
+	var colonIndex = data.indexOf(':');
+	var n = data.substring(0, colonIndex);
+	var d = JSON.parse(data.substring(colonIndex + 1));
+	return { name: n, data: d };
+}
+
+var eventHandlers = {}
+
+function handleMessage(event) {
+	var evt = parseData(event.data);
+	eventHandlers[evt.name](evt.data);
+}
+
+ws.onmessage = handleMessage;
 
 function contentLoaded() {
 	// The page has loaded completely, we can start.
@@ -255,32 +290,14 @@ function contentLoaded() {
 		require('ga')(window.config['google-analytics']);
 	}
 
-	socket = io.connect();
-
-	// The server emits dimension when we connect. We always sync our dimension
-	// to this data.
-	socket.on('dimension', handleDimensionData);
-
-	socket.on('goals', handleGoalData);
-
-	// The server sends us dimension diffs every turn.
-	socket.on('dimension.diff', handleDimensionDiff);
-
-	// The server sends us goals diffs in realtime.
-	socket.on('goals.diff', handleGoalsDiff);
-
-	// The server emits registered with our scryerId when we have sucessfully
-	// registered.
-	socket.on('registered', handleRegistered);
-
-	// If there is an error, show it.
-	socket.on('scryerError', catSelect.showError);
-
-	if (myScryerId) {
-		login();
-	} else {
-		console.log('no scryerId, you should register.');
-	}
+	eventHandlers = {
+		dimension: handleDimensionData,
+		goals: handleGoalData,
+		dimensionDiff: handleDimensionDiff,
+		goalsDiff: handleGoalsDiff,
+		registered: handleRegistered,
+		scryerError: catSelect.showError
+	};
 }
 
 // Listen for the page to indicate that it's ready.

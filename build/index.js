@@ -35,11 +35,7 @@ module.exports = function(req, res, next) {
 	
 	var builder = new Builder('.');
 	builder.copyAssetsTo('public');
-	builder.addLookup('node_modules');
-
-	builder.on('config', function () {
-		builder.append('window.config = ' + JSON.stringify(appConfig) + ';');
-	});
+	builder.append('window.config = ' + JSON.stringify(appConfig) + ';');
 
 	builder.build(function (err, res) {
 		if (err) return next(err);
