@@ -137,7 +137,7 @@ function setupChatHooks() {
 	chatinput.addEventListener('keypress', handleChatInput);
 
 	window.addEventListener('keypress', function (e) {
-		if (e.target === chatinput || e.ctrlKey || e.altKey) {
+		if (e.target === chatinput || e.ctrlKey || e.altKey || e.metaKey) {
 			return;			
 		}
 
