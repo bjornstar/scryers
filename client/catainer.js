@@ -100,8 +100,6 @@ Catainer.prototype.update = function () {
 	var distanceX = Math.abs(this.x - this.cat.pos.x);
 	var distanceY = Math.abs(this.y - this.cat.pos.y);
 
-	console.log(distanceX, distanceY, Math.sqrt(Math.pow(distanceX, 2) + Math.pow(distanceY, 2)));
-
 	var movement = 'translate(' + this.cat.pos.x + 'px, ' + this.cat.pos.y + 'px)';
 	var direction = 'scaleX(' + (this.cat.pos.d == 'l' ? -1 : 1) + ')';
 

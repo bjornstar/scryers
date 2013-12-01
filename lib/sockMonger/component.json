@@ -1,0 +1,13 @@
+{
+	"name": "sockMonger",
+	"description": "eventy websockets",
+	"version": "0.0.1",
+	"dependencies": {
+		"component/emitter": "*"
+	},
+	"main": "client.js",
+	"scripts": [
+		"client.js",
+		"socky.js"
+	]
+}

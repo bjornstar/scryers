@@ -76,7 +76,7 @@ exports.CatSelect = function () {
 	});
 
 	function attemptRegister(name) {
-		exports.hideBadName();
+		exports.hideError();
 		exports.emit('register', name, catType, propType);
 	}
 
@@ -84,16 +84,16 @@ exports.CatSelect = function () {
 	name.addEventListener('keydown', function (e) {
 		var nameString = name.value;
 
-		// If it's return and we have some text, login with that name.
+		// If it's return and we have some text, register with that name.
 		if (e.keyCode === 13 && nameString.length) {
 			attemptRegister(nameString);
 		}
 	});
 
 
-	var loginButton = document.getElementById('login');
+	var registerButton = document.getElementById('register');
 
-	loginButton.addEventListener('click', function (e) {
+	registerButton.addEventListener('click', function (e) {
 		var nameString = name.value;
 
 		// If we don't have any text, do nothing.
@@ -135,15 +135,15 @@ exports.hide = function() {
 exports.showError = function (error) {
 	console.error(error);
 
-	// Set the loginError text
-	var loginError = document.getElementById('loginError');
-	loginError.textContent = error;
+	// Set the registrationError text
+	var registrationError = document.getElementById('registrationError');
+	registrationError.textContent = error;
 
 	exports.show();
 };
 
-exports.hideBadName = function () {
+exports.hideError = function () {
 	// Clear the error text.
-	var loginError = document.getElementById('loginError');
-	loginError.textContent = '';
+	var registrationError = document.getElementById('registrationError');
+	registrationError.textContent = '';
 };

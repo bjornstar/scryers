@@ -32,12 +32,12 @@ var fs = require('fs');
 var express = require('express');
 var Tome = require('tomes').Tome;
 var uuid = require('node-uuid');
-var WebSocketServer = require('ws').Server;
 
 var appConfig = require('./config/');
 var build = require('./build/');
 var analytics = require('./analytics/');
-var move = require('./lib/move')
+var move = require('./lib/move');
+var SockMonger = require('./lib/sockMonger');
 
 // Heroku uses PORT
 // AppFog uses VCAP_APP_PORT
@@ -47,6 +47,9 @@ var chatDuration = 3000;
 
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
 var tGoals = Tome.conjure({});
+
+var tClients = Tome.conjure({});
+var scryerClientMap = {};
 
 var merging;
 
@@ -70,7 +73,7 @@ var movingScryers = {};
 function nextTurn() {
 	move(movingScryers);
 
-	sendDiffToAll();
+	sendTurn();
 
 	nextTurnTimeout = setTimeout(nextTurn, msToNextTurn());
 }
@@ -79,45 +82,45 @@ function rnd(n) {
 	return Math.floor(Math.random() * n);
 }
 
-function handleSocketDisconnect() {
-	var socketId = this.id;
+function delClient(clientId) {
+	console.log(clientId + ' disconnected.');
 
-	console.log(socketId + ' disconnected.');
+	delete newThisTurn[clientId];
 
-	// Delete the socket from the map, triggering the removal of the player
+	// Delete the client from the map, triggering the removal of the player
 	// from the dimension.
+	var scryerId = tClients[clientId];
 
-	tSockets.del(socketId);
+	if (!scryerId) {
+		return;
+	}
+
+	delete scryerClientMap[scryerId];
+
+	tClients.del(clientId);
 }
 
 function handleGoalsReadable() {
 	// If we are merging we will use broadcast to send the diff to all clients
 	// except for the one who sent it.
 
-	if (merging) {
+	if (merging || !tGoals.isDirty()) {
 		return;
 	}
 
-	var diff = tGoals.readAll();
+	var diffs = tGoals.readAll();
 
-	if (diff.length) {
-		console.log('goals.diff.broadcast: '+ JSON.stringify(diff));
-
-		// More of the match made in heaven: sockets.emit sends the diff to all
-		// connected clients.
-		gameIO.sockets.emit('goals.diff', diff);
-	}
+	sm.broadcast('goals.diff', diffs);
 }
 
 tGoals.on('readable', handleGoalsReadable);
 
 function mergeGoal(diff) {
-	var socketId = this.id;
-	console.log(socketId + ': ' + JSON.stringify(diff));
+	var clientId = this.id;
 
-	// If we got a diff from a strange socket, just ignore it.
-	if (!tSockets[socketId].scryerId) {
-		console.log('Invalid socket:', socketId)
+	// If we got a diff from a strange client, just ignore it.
+	if (!tClients[clientId].is()) {
+		console.log('Invalid client:', clientId)
 		return;
 	}
 
@@ -135,7 +138,7 @@ function mergeGoal(diff) {
 
 	// We can simply broadcast the diff which sends it to all clients except
 	// for the one that sent it.
-	this.broadcast.emit('goals.diff', diff);
+	this.broadcast('goals.diff', diff);
 }
 
 function newGoalPos() {
@@ -226,16 +229,26 @@ function logout(scryerId) {
 	});
 }
 
-function handleLogin(scryerId) {
-	var socket = this;
-	var socketId = this.id;
+var newThisTurn = {};
 
-	console.log(socketId + ': login as', scryerId);
+function handleLogin(scryerId) {
+	var client = this;
+	var clientId = this.id;
+
+	var currentClient = scryerClientMap[scryerId]
+
+	if (currentClient) {
+		console.log(clientId, 'took over', currentClient);
+		scryerClientMap[scryerId] = clientId;
+		tClients.move(currentClient, clientId);
+		sm.clients[currentClient].close();
+		return;
+	}
 
 	loadScryer(scryerId, function (error, scryerData) {
 		if (error) {
 			console.log('error: ', error);
-			return socket.emit('scryerError', error);
+			return client.remoteEmit('scryerError', error);
 		}
 
 		var goalData = {
@@ -258,26 +271,28 @@ function handleLogin(scryerId) {
 		tGoals[scryerId].chat.on('add', setChatExpire);
 
 		tGoals[scryerId].pos.on('readable', newGoalPos);
-		
-		// Map the scryerId to socketId so we know which socket belongs to which
-		// scryer.
-		tSockets[socketId].set('scryerId', scryerId);
 
-		tSockets[socketId].on('destroy', function () {
-			console.log(socketId, 'disconnected. logging out', scryerId, '.');
+		// Map the scryerId to clientId so we know which client belongs to which
+		// scryer.
+		tClients[clientId].assign(scryerId);
+
+		tClients[clientId].on('destroy', function () {
+			console.log(clientId, 'disconnected. logging out', scryerId, '.');
 			logout(scryerId);
 		});
 
+		scryerClientMap[scryerId] = clientId;
+
 		// And tell the client who is logging in what their scryerId is.
-		socket.emit('loggedIn', scryerId);
+		client.remoteEmit('loggedIn', scryerId);
 	});
 }
 
 function handleRegister(name, catType, propType) {
-	var socket = this;
-	var socketId = this.id;
+	var client = this;
+	var clientId = this.id;
 
-	console.log(socketId + ': register as', name, catType, propType);
+	console.log(clientId + ': register as', name, catType, propType);
 
 	// Let's set some random values as defaults
 	var rndX = rnd(500) + 50;
@@ -305,58 +320,40 @@ function handleRegister(name, catType, propType) {
 	saveScryer(scryerId, newScryer, function (error) {
 		if (error) {
 			console.log('error saving new scryer', error);
-			return socket.emit('scryerError', error);
+			return client.remoteEmit('scryerError', error);
 		}
 
-		socket.emit('registered', scryerId);
+		client.remoteEmit('registered', scryerId);
 
 		analytics.identify({ userId: scryerId, traits: { name: name, catType: catType, propType: propType } });
 	});
 }
 
-function parseData(data) {
-	var colonIndex = data.indexOf(':');
-	var n = data.substring(0, colonIndex);
-	var d = JSON.parse(data.substring(colonIndex + 1));
-	return { name: n, data: d };
-}
+function addClient(clientId) {
+	console.log(clientId, 'connected.');
 
-var eventHandlers = {
-	login: handleLogin
-}
+	newThisTurn[clientId] = tDimension.getVersion();
 
-function handleMessage(data) {
-	var evt = parseData(data);
-	eventHandlers[evt.name](evt.data);
-}
+	tClients.set(clientId, '');
 
-var connectedSockets = [];
-
-function clientConnect(socket) {
-	// Remember this socket. We will associate the playe with the socket once
-	// they log in.
-
-	connectedSockets.push(socket);
+	var client = sm.clients[clientId];
 
 	// When a client connects, we send them a copy of the dimension. This is
 	// synchronized once per turn.
-	socket.send('dimension:' + JSON.stringify(tDimension));
+	client.remoteEmit('dimension', tDimension);
 
 	// We also send them the goals tome. This is synchronized in realtime and
 	// is how scryers can influence the dimension.
-	socket.send('goals:' + JSON.stringify(tGoals));
-
-	// On disconnect, clean up.
-	socket.on('close', handleSocketDisconnect);
+	client.remoteEmit('goals', tGoals);
 
 	// On diff, the client sent us a change to their goal.
-	socket.on('diff', mergeGoal);
+	client.on('diff', mergeGoal);
 
 	// On login, the client is trying to login.
-	socket.on('message', handleMessage);
+	client.on('login', handleLogin);
 
 	// On register, the client needs to create an account.
-	socket.on('register', handleRegister);
+	client.on('register', handleRegister);
 }
 
 function isNumber (o) {
@@ -418,27 +415,31 @@ var gameServer = gameExpress.listen(port, function () {
 	}
 });
 
+var sm = new SockMonger({ server: gameServer });
+sm.on('add', addClient);
+sm.on('del', delClient);
 
-var wss = new WebSocketServer({ port: 3001 });
-wss.on('connection', clientConnect);
-
-function sendDiffToAll() {
-	// If we are merging we will use broadcast to send the diff to all clients
-	// except for the one who sent it.
-
-	if (merging) {
+function sendTurn() {
+	if (!tDimension.isDirty()) {
 		return;
 	}
 
-	var diff = tDimension.readAll();
+	var currentVersion = tDimension.getVersion();
 
-	if (diff.length) {
-		console.log('dimension.diff.broadcast: '+ JSON.stringify(diff));
+	var diffs = tDimension.readAll();
 
-		// More of the match made in heaven: sockets.emit sends the diff to all
-		// connected clients.
-		gameIO.sockets.emit('dimension.diff', diff);
+	var exclude = [];
+
+	for (var newId in newThisTurn) {
+		exclude.push(newId);
+
+		var trimmedDiffs = diffs.slice(diffs.length - (currentVersion - newThisTurn[newId]));
+		sm.clients[newId].remoteEmit('dimension.diff', trimmedDiffs);
 	}
+
+	newThisTurn = {};
+
+	sm.broadcast('dimension.diff', diffs, exclude);
 }
 
 // Start the turnEngine.

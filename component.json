@@ -1,7 +1,7 @@
 {
   "name": "scryers",
   "description": "You start with fire.",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "dependencies": {
     "bjornstar/tome-log": "*",
     "bjornstar/tomes": "*",
@@ -11,6 +11,12 @@
     "component/raf": "*",
     "component/tween": "*"
   },
+  "local": [
+  	"sockMonger"
+  ],
+  "paths": [
+  	"lib"
+  ],
   "scripts": [
     "client/index.js",
     "client/catselect.js",

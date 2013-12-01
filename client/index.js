@@ -42,21 +42,26 @@ var myGoals;
 var tDimension = Tome.conjure({});
 var tGoals = Tome.conjure({});
 
-window.dimension = tDimension;
-window.goals = tGoals;
+// In development mode we stick em on the window for easy access.
+if (window.config.developmentMode) {
+	window.dimension = tDimension;
+	window.goals = tGoals;	
+}
 
-var ws = new WebSocket(window.config.wsurl);
+var sm = require('sockMonger');
+
+window.sm = sm;
 
 function handleOpen() {
 	console.log('The portal is opening...');
 	if (myScryerId) {
 		login();
 	} else {
-		console.log('I have not seen you before.');
+		console.log('You must be new here, what\'s your name?');
 	}
 }
 
-ws.onopen = handleOpen;
+sm.on('open', handleOpen);
 
 function l(something) {
 	console.log(something);
@@ -77,8 +82,9 @@ function handleNewCoords(newX, newY) {
 	// We update our position and it gets automatically distributed to all the
 	// other users thanks to the magic of tomes.
 
-	myGoals.pos.x.assign(newX);
-	myGoals.pos.y.assign(newY);
+	var newPos = { x: newX, y: newY };
+
+	myGoals.pos.assign(newPos);
 }
 
 function handleMeDestroy() {
@@ -104,10 +110,8 @@ function handleMeReadable() {
 	// Get the changes
 	var diff = this.read();
 
-	if (diff) {
-		// Send them to the server.
-		socket.emit('diff', diff);
-	}
+	// Send them to the server.
+	sm.remoteEmit('diff', diff);
 }
 
 function handleChatInput(e) {
@@ -182,10 +186,16 @@ function addScryer(scryerId) {
 function handleDimensionData(data) {
 	// When we connect to the server, the server sends us a copy of the
 	// dimension.
+
 	console.log('got dimension:', data);
+
 	// If we already have a dimension we can just assign over it and
 	// everything gets cleaned up automatically.
 	tDimension.assign(data);
+
+	tDimension.on('readable', function () {
+		tDimension.read();
+	});
 
 	// Go through the list of scryers in the dimension and add them to our
 	// dimension.
@@ -199,18 +209,25 @@ function handleDimensionData(data) {
 	tDimension.scryers.on('add', addScryer);
 }
 
-var loginWatcher = tGoals.on('add', function (id) {
-	if (id !== myScryerId) {
-		return;
+function handleGoalsData(data) {
+	console.log('got goals:', data);
+
+	merging = true;
+	tGoals.assign(data);
+	tGoals.read();
+	merging = false;
+
+	if (myScryerId && tGoals.hasOwnProperty(myScryerId)) {
+		return finishLogin();
 	}
 
-	finishLogin();
-});
+	tGoals.on('add', function (id) {
+		if (id !== myScryerId) {
+			return;
+		}
 
-
-function handleGoalData(data) {
-	console.log('got goals:', data);
-	tGoals.assign(data);
+		return finishLogin();
+	});
 }
 
 function handleDimensionDiff(diff) {
@@ -240,31 +257,15 @@ function handleGoalsDiff(diff) {
 
 function login() {
 	console.log('sending login:' + myScryerId);
-	ws.send('login:' + JSON.stringify(myScryerId));
+	sm.remoteEmit('login', myScryerId);
 }
 
 function register(name, catType, propType, pos) {
 	// Register our scryer's details. The server will either emit an error. On
 	// success, the server will emit our scryerId.
 	console.log('emitting register:', name, catType, propType, pos);
-	socket.emit('register', name, catType, propType, pos);
+	sm.remoteEmit('register', name, catType, propType, pos);
 }
-
-function parseData(data) {
-	var colonIndex = data.indexOf(':');
-	var n = data.substring(0, colonIndex);
-	var d = JSON.parse(data.substring(colonIndex + 1));
-	return { name: n, data: d };
-}
-
-var eventHandlers = {}
-
-function handleMessage(event) {
-	var evt = parseData(event.data);
-	eventHandlers[evt.name](evt.data);
-}
-
-ws.onmessage = handleMessage;
 
 function contentLoaded() {
 	// The page has loaded completely, we can start.
@@ -290,14 +291,15 @@ function contentLoaded() {
 		require('ga')(window.config['google-analytics']);
 	}
 
-	eventHandlers = {
-		dimension: handleDimensionData,
-		goals: handleGoalData,
-		dimensionDiff: handleDimensionDiff,
-		goalsDiff: handleGoalsDiff,
-		registered: handleRegistered,
-		scryerError: catSelect.showError
-	};
+	sm.on('dimension', handleDimensionData);
+	sm.on('dimension.diff', handleDimensionDiff);
+
+	sm.on('goals', handleGoalsData);
+	sm.on('goals.diff', handleGoalsDiff);
+
+	sm.on('registered', handleRegistered);
+
+	sm.on('scryerError', catSelect.showError);
 }
 
 // Listen for the page to indicate that it's ready.
