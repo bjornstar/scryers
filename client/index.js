@@ -50,8 +50,6 @@ if (window.config.developmentMode) {
 
 var sm = require('sockMonger');
 
-window.sm = sm;
-
 function handleOpen() {
 	console.log('The portal is opening...');
 	if (myScryerId) {
@@ -62,15 +60,6 @@ function handleOpen() {
 }
 
 sm.on('open', handleOpen);
-
-function l(something) {
-	console.log(something);
-}
-
-var socket = {
-	on: l,
-	emit: l
-};
 
 // This is our click handler.
 function handleNewCoords(newX, newY) {
@@ -84,7 +73,10 @@ function handleNewCoords(newX, newY) {
 
 	var newPos = { x: newX, y: newY };
 
-	myGoals.pos.assign(newPos);
+	if (!myGoals.pos.x.is(newX) || !myGoals.pos.y.is(newY)) {
+		myGoals.pos.assign(newPos);
+	}
+	
 }
 
 function handleMeDestroy() {
@@ -93,7 +85,7 @@ function handleMeDestroy() {
 
 	console.log('I was destroyed.');
 
-	login();
+	myGoals.removeAllListeners();
 }
 
 function handleMeReadable() {
@@ -151,13 +143,6 @@ function setupChatHooks() {
 	chatinput.focus();
 }
 
-function handleRegistered(scryerId) {
-	window.localStorage.setItem('scryerId', scryerId);
-	myScryerId = scryerId;
-
-	login();
-}
-
 function finishLogin() {
 	myGoals = tGoals[myScryerId];
 
@@ -171,6 +156,23 @@ function finishLogin() {
 	setupChatHooks();
 
 	view.setRef(myGoals);
+}
+
+var watchForMyGoals = tGoals.on('add', function (id) {
+	if (!myScryerId && id !== myScryerId) {
+		return;
+	}
+
+	tGoals.removeListener('add', watchForMyGoals);
+
+	finishLogin();
+});
+
+function handleRegistered(scryerId) {
+	window.localStorage.setItem('scryerId', scryerId);
+	myScryerId = scryerId;
+
+	login();
 }
 
 function addScryer(scryerId) {
@@ -216,18 +218,6 @@ function handleGoalsData(data) {
 	tGoals.assign(data);
 	tGoals.read();
 	merging = false;
-
-	if (myScryerId && tGoals.hasOwnProperty(myScryerId)) {
-		return finishLogin();
-	}
-
-	tGoals.on('add', function (id) {
-		if (id !== myScryerId) {
-			return;
-		}
-
-		return finishLogin();
-	});
 }
 
 function handleDimensionDiff(diff) {

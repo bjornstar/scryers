@@ -1,7 +1,7 @@
 {
   "name": "scryers",
   "description": "You start with fire.",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "dependencies": {
     "bjornstar/tome-log": "*",
     "bjornstar/tomes": "*",
