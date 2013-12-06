@@ -102,6 +102,10 @@ function handleMeReadable() {
 	// Get the changes
 	var diff = this.read();
 
+	if (!diff) {
+		return;
+	}
+
 	// Send them to the server.
 	sm.remoteEmit('diff', diff);
 }
@@ -237,11 +241,10 @@ function handleGoalsDiff(diff) {
 	// our dimension. We can attempt to influence our dimension by modifying
 	// our goals here.
 	console.log('got goals diff:', diff);
-	merging = true;
 
+	merging = true;
 	tGoals.merge(diff);
 	tGoals.readAll();
-
 	merging = false;
 }
 

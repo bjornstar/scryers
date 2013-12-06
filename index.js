@@ -110,6 +110,10 @@ function handleGoalsReadable() {
 
 	var diffs = tGoals.readAll();
 
+	if (!diffs) {
+		return;
+	}
+
 	sm.broadcast('goals.diff', diffs);
 }
 
@@ -121,6 +125,11 @@ function mergeGoal(diff) {
 	// If we got a diff from a strange client, just ignore it.
 	if (!tClients[clientId].is()) {
 		console.log('Invalid client:', clientId)
+		return;
+	}
+
+	if (!diff) {
+		console.log('empty diff');
 		return;
 	}
 
