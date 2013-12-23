@@ -19,7 +19,7 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-//  _______  _______  ______    __   __  _______  ______    _______ 
+//  _______  _______  ______    __   __  _______  ______    _______
 // |       ||       ||    _ |  |  | |  ||       ||    _ |  |       |
 // |  _____||       ||   | ||  |  |_|  ||    ___||   | ||  |  _____|
 // | |_____ |       ||   |_||_ |       ||   |___ |   |_||_ | |_____
@@ -43,7 +43,6 @@ var SockMonger = require('./lib/sockMonger');
 // AppFog uses VCAP_APP_PORT
 
 var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
-var chatDuration = 3000;
 
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
 var tGoals = Tome.conjure({});
@@ -53,25 +52,17 @@ var scryerClientMap = {};
 
 var merging;
 
-function nameIsOk(name) {
-	// Is the name empty?
-	if (name.trim() === '') {
-		return false;
-	}
-
-	return true;
-}
-
 function msToNextTurn() {
 	return Date.now() % appConfig.msPerTurn || 1000;
 }
 
 var nextTurnTimeout;
 
-var movingScryers = {};
+// This holds all of the whims that need to move.
+var moving = {};
 
 function nextTurn() {
-	move(movingScryers);
+	move(moving);
 
 	sendTurn();
 
@@ -100,25 +91,6 @@ function delClient(clientId) {
 	tClients.del(clientId);
 }
 
-function handleGoalsReadable() {
-	// If we are merging we will use broadcast to send the diff to all clients
-	// except for the one who sent it.
-
-	if (merging || !tGoals.isDirty()) {
-		return;
-	}
-
-	var diffs = tGoals.readAll();
-
-	if (!diffs) {
-		return;
-	}
-
-	sm.broadcast('goals.diff', diffs);
-}
-
-tGoals.on('readable', handleGoalsReadable);
-
 function mergeGoal(diff) {
 	var clientId = this.id;
 
@@ -143,8 +115,6 @@ function mergeGoal(diff) {
 
 	merging = false;
 
-	// Here is the perfect storm: tomes + socket.io
-
 	// We can simply broadcast the diff which sends it to all clients except
 	// for the one that sent it.
 	this.broadcast('goals.diff', diff);
@@ -154,34 +124,19 @@ function newGoalPos() {
 	var scryerId = this.getParent().getKey();
 	var scryer = tDimension.scryers[scryerId];
 
-	if (!this.x.is(scryer.pos.x) || !this.y.is(scryer.pos.y)) {
-		movingScryers[scryerId] = { dim: scryer.pos, goal: this, speed: scryer.speed };
+	for (var whimId in scryer.whims) {
+		if (scryer.whims.hasOwnProperty(whimId)) {
+			var whim = scryer.whims[whimId];
+			moving[whimId] = { pos: whim.pos, goal: this, speed: whim.speed };
 
-		// If our scryer gets deleted while it's moving, we need to remove it
-		// from the moving list.
-		scryer.on('destroy', function () {
-			delete movingScryers[scryerId];
-		});
+			// If our whim gets deleted while it's moving, we need to remove it
+			// from the moving list.
+
+			whim.on('destroy', function () {
+				delete moving[whimId];
+			});
+		}
 	}
-}
-
-// We want our chat message to expire after a certain amount of time so that we
-// don't have them clogging up our tubes.
-function setChatExpire() {
-	var that = this;
-	
-	var chatExpire = setTimeout(function () {
-		// Shift the chat message off the front of the array, the magic of
-		// of tomes updates all our clients.
-		that.shift();
-	}, chatDuration);
-
-	// It's possible that our scryer disconnects before the chat expires. In
-	// tha case, clear the timeout so we are not modifying destroyed tomes.
-
-	this.on('destroy', function () {
-		clearTimeout(chatExpire);
-	});
 }
 
 function getScryerPath(scryerId) {
@@ -261,8 +216,7 @@ function handleLogin(scryerId) {
 		}
 
 		var goalData = {
-			pos: scryerData.pos,
-			chat: []
+			pos: scryerData.portal
 		};
 
 		// Sneakily bump the lastseen before it gets turned into a tome.
@@ -274,10 +228,6 @@ function handleLogin(scryerId) {
 
 		// Add the scryer to our goals, which gets updated in realtime.
 		tGoals.set(scryerId, goalData);
-
-		// When we receive a chat message, queue it up for deletion after a period
-		// of time.
-		tGoals[scryerId].chat.on('add', setChatExpire);
 
 		tGoals[scryerId].pos.on('readable', newGoalPos);
 
@@ -297,31 +247,27 @@ function handleLogin(scryerId) {
 	});
 }
 
-function handleRegister(name, catType, propType) {
+function handleRegister(name) {
 	var client = this;
 	var clientId = this.id;
 
-	console.log(clientId + ': register as', name, catType, propType);
+	console.log(clientId + ': register as', name);
 
 	// Let's set some random values as defaults
 	var rndX = rnd(500) + 50;
 	var rndY = rnd(400) + 50;
-	var rndCat = rnd(10) + 1;
-	var rndProp = rnd(7) + 1;
 
 	// This is where your scryer is born.
 	var newScryer = {
 		id: uuid.v4(),
+		lastlogin: Date.now(),
 		name: name,
-		catType: catType || 'c' + rndCat,
-		propType: propType || 'a' + rndProp,
-		pos: {
+		portal: {
 			x: rndX,
-			y: rndY,
-			d: 'r'
+			y: rndY
 		},
 		registered: Date.now(),
-		lastlogin: Date.now()
+		whims: {}
 	};
 
 	var scryerId = newScryer.id;
@@ -334,7 +280,7 @@ function handleRegister(name, catType, propType) {
 
 		client.remoteEmit('registered', scryerId);
 
-		analytics.identify({ userId: scryerId, traits: { name: name, catType: catType, propType: propType } });
+		analytics.identify({ userId: scryerId, traits: { name: name } });
 	});
 }
 
@@ -376,7 +322,7 @@ function isNumber (o) {
 var gameExpress = express();
 
 // Some handy express builtins.
-gameExpress.use(express.favicon());
+//gameExpress.use(express.favicon());
 //gameExpress.use(express.logger('dev'));
 
 // See that build in there? When the client requests the index page, we build
@@ -403,6 +349,7 @@ gameExpress.get('/images/:image', function (req, res) {
 	res.sendfile('./client/images/' + image);
 });
 
+// Audio files served from /client/audio
 gameExpress.get('/audio/:audio', function (req, res) {
 	var audio = req.params.audio;
 	res.sendfile('./client/audio/' + audio);
@@ -427,6 +374,25 @@ var gameServer = gameExpress.listen(port, function () {
 var sm = new SockMonger({ server: gameServer });
 sm.on('add', addClient);
 sm.on('del', delClient);
+
+function handleGoalsReadable() {
+	// If we are merging we will use broadcast to send the diff to all clients
+	// except for the one who sent it.
+
+	if (merging || !tGoals.isDirty()) {
+		return;
+	}
+
+	var diffs = tGoals.readAll();
+
+	if (!diffs) {
+		return;
+	}
+
+	sm.broadcast('goals.diff', diffs);
+}
+
+tGoals.on('readable', handleGoalsReadable);
 
 function sendTurn() {
 	if (!tDimension.isDirty()) {

@@ -1,7 +1,7 @@
 {
   "name": "scryers",
   "description": "You start with fire.",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "dependencies": {
     "bjornstar/tome-log": "*",
     "bjornstar/tomes": "*",
@@ -20,7 +20,9 @@
   "scripts": [
     "client/index.js",
     "client/catselect.js",
-    "client/catainer.js",
+    "client/goal.js",
+    "client/portal.js",
+    "client/whim.js",
     "client/cssView.js",
     "client/canvasView.js"
   ],

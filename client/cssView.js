@@ -28,7 +28,9 @@
 
 var EventEmitter = require('emitter');
 var inherits = require('inherit');
-var Catainer = require('./catainer').Catainer;
+var Goal = require('./goal');
+var Portal = require('./portal');
+var Whim = require('./whim');
 
 var id = 0;
 
@@ -40,9 +42,24 @@ function CssView(map, ref) {
 	this.ref = ref;
 	this.offset = { x: 0, y: 0 };
 
+	var debugInfo = document.createElement('DIV');
+	debugInfo.className = 'debugInfo';
+
+	var offsetSpan = document.createElement('SPAN');
+	offsetSpan.textContent = 'x: ' + this.offset.x + ', y: ' + this.offset.y;
+
+	var mouseSpan = document.createElement('SPAN');
+	var lineBreak = document.createElement('BR');
+
+	debugInfo.appendChild(offsetSpan);
+	debugInfo.appendChild(lineBreak);
+	debugInfo.appendChild(mouseSpan);
+
 	var view = this.view = document.createElement('DIV');
 	view.className = 'view';
-	view.id = id;
+	view.id = this.id;
+
+	view.appendChild(debugInfo);
 
 	id += 1;
 
@@ -51,44 +68,29 @@ function CssView(map, ref) {
 	}
 
 	var that = this;
-	view.addEventListener('mouseup', function(event) {
+	view.addEventListener('mouseup', function (event) {
 		var newX = event.pageX;
 		var newY = event.pageY;
 		that.emit('newCoords', newX, newY);
+	});
+
+	view.addEventListener('mousemove', function (event) {
+		mouseSpan.textContent = 'x: ' + event.pageX + ', y: ' + event.pageY;
 	});
 }
 
 inherits(CssView, EventEmitter);
 
-CssView.prototype.addCat = function (cat) {
-	var myCatainer = new Catainer(cat);
+CssView.prototype.addWhim = function (whim) {
+	var myWhim = new Whim(whim, this.view);
+};
 
-	var element = myCatainer.rootElement;
-	this.view.appendChild(element);
+CssView.prototype.addPortal = function (portal) {
+	var myPortal = new Portal(portal, this.view);
+};
 
-	cat.pos.on('readable', function () {
-		myCatainer.update();
-	});
-
-	cat.on('destroy', function () {
-		myCatainer.destroy();
-	});
-
-/*
-	cat.chat.on('add', function (index) {
-		var chatText = this[index];
-		
-		var chatDiv = myCatainer.chat(chatText);
-
-		// The server takes care of cleaning up chat messages after a certain
-		// period of time. All we need to do is listen for it to be destroyed
-		// and remove the chat bubble.
-		
-		chatText.on('destroy', function () {
-			myCatainer.destroyChat(chatDiv);
-		});
-	});
-*/
+CssView.prototype.addGoal = function (goal) {
+	var myGoal = new Goal(goal, this.view);
 };
 
 CssView.prototype.remove = function (element) {

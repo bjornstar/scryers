@@ -77,7 +77,7 @@ exports.CatSelect = function () {
 
 	function attemptRegister(name) {
 		exports.hideError();
-		exports.emit('register', name, catType, propType);
+		exports.emit('register', name);
 	}
 
 	// Listen for return.

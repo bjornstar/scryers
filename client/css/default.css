@@ -47,14 +47,20 @@ a {
   bottom: 32px;
   background-color: #d4f1b3;
   z-index: 1;
-  background-image: url('/images/grass.png');
+  background-image: url('/images/grid-100x100.png');
   display: block;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: moz-none;
+  -ms-user-select: none;
+  user-select: none;
 }
 div.view {
   width:100%;
 }
 
-div.catainer {
+div.whim {
   position: absolute;
   width: 0;
   height: 0;
@@ -65,22 +71,21 @@ div.catainer {
   -o-transition: -o-transform 1s linear, opacity 1s;
 }
 
-div.cat {
+div.slime {
   position: absolute;
   width: 100px;
-  height: 91px;
+  height: 100px;
   margin-left: -50px;
-  margin-top: -45px;
+  margin-top: -50px;
   z-index: 2;
 }
 
-div.prop {
-  position: absolute;
-  width: 100px;
-  height: 91px;
-  margin-left: -50px;
-  margin-top: -45px;
-  z-index: 3;
+div.portal, div.goal {
+	position: absolute;
+	width: 100px;
+	height: 100px;
+	margin-left: -50px;
+	margin-top: -85px;
 }
 
 div.nametag {
@@ -94,27 +99,6 @@ div.nametag {
   -o-transform: translateX(-50%);
   min-width: 300px;
   text-align: center;
-}
-
-div.chatList {
-  position: absolute;
-  bottom: 45px;
-  margin-left: -50px;
-  min-width: 300px;
-  font-size: 16px;
-}
-
-div.chatList div {
-  background: #fff;
-  border: 2px solid #000;
-  margin: 4px;
-  padding: 4px;
-  -webkit-transition: opacity 1s;
-  -moz-transition: opacity 1s;
-  -ms-transition: opacity 1s;
-  -o-transition: opacity 1s;
-  opacity: 0;
-  border-radius: 9.3px;
 }
 
 ul {
@@ -163,43 +147,43 @@ li img {
 }
 
 .c1 img {
-  background-image: url('/images/c1.png');
+  background-image: url('/images/slime.png');
 }
 
 .c2 img {
-  background-image: url('/images/c2.png');
+  background-image: url('/images/slime.png');
 }
 
 .c3 img {
-  background-image: url('/images/c3.png');
+  background-image: url('/images/slime.png');
 }
 
 .c4 img {
-  background-image: url('/images/c4.png');
+  background-image: url('/images/slime.png');
 }
 
 .c5 img {
-  background-image: url('/images/c5.png');
+  background-image: url('/images/slime.png');
 }
 
 .c6 img {
-  background-image: url('/images/c6.png');
+  background-image: url('/images/slime.png');
 }
 
 .c7 img {
-  background-image: url('/images/c7.png');
+  background-image: url('/images/slime.png');
 }
 
 .c8 img {
-  background-image: url('/images/c8.png');
+  background-image: url('/images/slime.png');
 }
 
 .c9 img {
-  background-image: url('/images/c9.png');
+  background-image: url('/images/slime.png');
 }
 
 .c10 img {
-  background-image: url('/images/c10.png');
+  background-image: url('/images/slime.png');
 }
 
 #yourCat {
@@ -212,4 +196,8 @@ li img {
   text-align: right;
   margin-right: 10px;
   cursor: pointer;
+}
+
+.debugInfo {
+	position: absolute;
 }

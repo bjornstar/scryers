@@ -19,7 +19,7 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-//  _______  _______  ______    __   __  _______  ______    _______ 
+//  _______  _______  ______    __   __  _______  ______    _______
 // |       ||       ||    _ |  |  | |  ||       ||    _ |  |       |
 // |  _____||       ||   | ||  |  |_|  ||    ___||   | ||  |  _____|
 // | |_____ |       ||   |_||_ |       ||   |___ |   |_||_ | |_____
@@ -45,7 +45,7 @@ var tGoals = Tome.conjure({});
 // In development mode we stick em on the window for easy access.
 if (window.config.developmentMode) {
 	window.dimension = tDimension;
-	window.goals = tGoals;	
+	window.goals = tGoals;
 }
 
 var sm = require('sockMonger');
@@ -76,7 +76,6 @@ function handleNewCoords(newX, newY) {
 	if (!myGoals.pos.x.is(newX) || !myGoals.pos.y.is(newY)) {
 		myGoals.pos.assign(newPos);
 	}
-	
 }
 
 function handleMeDestroy() {
@@ -89,7 +88,7 @@ function handleMeDestroy() {
 }
 
 function handleMeReadable() {
-	// This is the magic of tomes. Whenever we make changes to our cat, we send
+	// This is the magic of tomes. Whenever we make changes to our goal, we send
 	// that to the server.
 
 	// We set merging to true when we receive data from the server. Since we
@@ -110,43 +109,6 @@ function handleMeReadable() {
 	sm.remoteEmit('diff', diff);
 }
 
-function handleChatInput(e) {
-	// When you press enter (keycode 13) and there is text in the chat box.
-	var chatText = this.value;
-	if (e.keyCode === 13 && chatText.length) {
-		// Push the text onto our chat object. Remember, any changes we make
-		// automatically get sent to the server so we don't have to do anything
-		// else.
-		myGoals.chat.push(chatText);
-
-		// clear the chat box.
-		this.value = '';
-		
-		return false;
-	}
-	return true;
-}
-
-function setupChatHooks() {
-	// Setup a listener for the chat box.
-	var chatinput = document.getElementById('chat');
-	chatinput.addEventListener('keypress', handleChatInput);
-
-	window.addEventListener('keypress', function (e) {
-		if (e.target === chatinput || e.ctrlKey || e.altKey || e.metaKey) {
-			return;			
-		}
-
-		var code = e.keyCode || e.charCode;
-		chatinput.focus();
-		chatinput.value += String.fromCharCode(code);
-		e.preventDefault();
-	});
-
-	// Set keyboard focus to the chat box.
-	chatinput.focus();
-}
-
 function finishLogin() {
 	myGoals = tGoals[myScryerId];
 
@@ -155,9 +117,6 @@ function finishLogin() {
 	myGoals.on('destroy', handleMeDestroy);
 
 	catSelect.hide();
-
-	// Setup the chat box event handlers.
-	setupChatHooks();
 
 	view.setRef(myGoals);
 }
@@ -184,9 +143,11 @@ function addScryer(scryerId) {
 
 	var scryer = tDimension.scryers[scryerId];
 
-	// Add the cat to the view, the views are responsible for hooking up
-	// events.
-	view.addCat(scryer);
+	view.addPortal(scryer.portal);
+
+	scryer.whims.on('add', function (whimId) {
+		view.addWhim(this[whimId]);
+	});
 }
 
 function handleDimensionData(data) {
@@ -253,11 +214,11 @@ function login() {
 	sm.remoteEmit('login', myScryerId);
 }
 
-function register(name, catType, propType, pos) {
+function register(name) {
 	// Register our scryer's details. The server will either emit an error. On
 	// success, the server will emit our scryerId.
-	console.log('emitting register:', name, catType, propType, pos);
-	sm.remoteEmit('register', name, catType, propType, pos);
+	console.log('emitting register:', name);
+	sm.remoteEmit('register', name);
 }
 
 function contentLoaded() {
@@ -266,7 +227,7 @@ function contentLoaded() {
 	catSelect = require('./catselect').CatSelect();
 
 	catSelect.on('register', register);
-	
+
 	// Look at our URL and see if we want CSS or Canvas
 	if (window.location.href.match(/#canvas/i)) {
 		var CanvasView = require('./canvasView').CanvasView;
@@ -277,6 +238,10 @@ function contentLoaded() {
 	}
 
 	view.on('newCoords', handleNewCoords);
+
+	tGoals.on('add', function (scryerId) {
+		view.addGoal(tGoals[scryerId]);
+	});
 
 	window.scrollTo(0,1);
 
