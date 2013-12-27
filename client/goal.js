@@ -36,7 +36,7 @@ function onEnd(what, then) {
 
 function Goal(goal, view) {
 	this.goal = goal;
-console.log(goal);
+
 	this.x = goal.pos.x.valueOf();
 	this.y = goal.pos.y.valueOf();
 
@@ -44,7 +44,7 @@ console.log(goal);
 
 	var cnt = this.rootElement = document.createElement('div');
 	cnt.id = goal.getKey();
-	cnt.className = 'goalContainer';
+	cnt.className = 'container';
 	transform(cnt, position);
 
 	// Create the goal.
@@ -95,24 +95,21 @@ Goal.prototype.update = function () {
 Goal.prototype.destroy = function () {
 	// We fade out the goal by setting the opacity to 0.
 	var cnt = this.rootElement;
-	cnt.style.opacity = 0;
 
 	function removeGoal(e) {
 		// We might have multiple transitions, the one we want to pay attention
 		// to is the one for opacity.
 
-		if (e.propertyName !== 'opacity') {
-			return;
+		if (e.propertyName === 'opacity') {
+			cnt.parentNode.removeChild(cnt);
 		}
-
-		var view = cnt.parentNode;
-		view.removeChild(cnt);
-
-		e.stopPropagation();
 	}
 
 	// and when the opacity reaches 0 we remove the goal from the dimension.
+
 	onEnd(cnt, removeGoal);
+
+	cnt.style.opacity = 0;
 };
 
 module.exports = Goal;

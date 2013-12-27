@@ -217,8 +217,11 @@ function login() {
 function register(name) {
 	// Register our scryer's details. The server will either emit an error. On
 	// success, the server will emit our scryerId.
-	console.log('emitting register:', name);
-	sm.remoteEmit('register', name);
+
+	var data = { name: name };
+
+	console.log('emitting register:', data);
+	sm.remoteEmit('register', data);
 }
 
 function contentLoaded() {

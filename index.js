@@ -27,17 +27,15 @@
 //  _____| ||     |_ |   |  | |  |   |  |   |___ |   |  | | _____| |
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
-var fs = require('fs');
-
 var express = require('express');
 var Tome = require('tomes').Tome;
-var uuid = require('node-uuid');
 
 var appConfig = require('./config/');
 var build = require('./build/');
 var analytics = require('./analytics/');
 var move = require('./lib/move');
 var SockMonger = require('./lib/sockMonger');
+var Scryer = require('./lib/scryer');
 
 // Heroku uses PORT
 // AppFog uses VCAP_APP_PORT
@@ -49,6 +47,7 @@ var tGoals = Tome.conjure({});
 
 var tClients = Tome.conjure({});
 var scryerClientMap = {};
+var newThisTurn = {};
 
 var merging;
 
@@ -67,10 +66,6 @@ function nextTurn() {
 	sendTurn();
 
 	nextTurnTimeout = setTimeout(nextTurn, msToNextTurn());
-}
-
-function rnd(n) {
-	return Math.floor(Math.random() * n);
 }
 
 function delClient(clientId) {
@@ -139,49 +134,10 @@ function newGoalPos() {
 	}
 }
 
-function getScryerPath(scryerId) {
-	return './scryers/' + scryerId + '.json';
-}
-
-function saveScryer(scryerId, scryer, callback) {
-	var scryerPath = getScryerPath(scryerId);
-
-	var out = JSON.stringify(scryer, null, '\t');
-
-	fs.writeFile(scryerPath, out, { encoding: 'utf8' }, function (error) {
-		if (error) {
-			return callback(error);
-		}
-
-		callback();
-	});
-}
-
-function loadScryer(scryerId, callback) {
-	var scryerPath = getScryerPath(scryerId);
-
-	fs.readFile(scryerPath, { encoding: 'utf8' }, function (error, data) {
-		if (error) {
-			return callback(error);
-		}
-
-		var scryer;
-
-		try {
-			scryer = JSON.parse(data);
-		} catch (e) {
-			console.log('error reading:', scryerPath )
-			return callback(error);
-		}
-
-		callback(null, scryer);
-	});
-}
-
 function logout(scryerId) {
 	tDimension.scryers[scryerId].set('lastlogout', Date.now());
 
-	saveScryer(scryerId, tDimension.scryers[scryerId], function(error) {
+	Scryer.save(tDimension.scryers[scryerId], function(error) {
 		if (error) {
 			console.log('error saving:', scryerId, error)
 		}
@@ -192,8 +148,6 @@ function logout(scryerId) {
 		analytics.track({ userId: scryerId, event: 'disconnected' });
 	});
 }
-
-var newThisTurn = {};
 
 function handleLogin(scryerId) {
 	var client = this;
@@ -209,10 +163,18 @@ function handleLogin(scryerId) {
 		return;
 	}
 
-	loadScryer(scryerId, function (error, scryerData) {
+	Scryer.load(scryerId, function (error, scryerData) {
 		if (error) {
 			console.log('error: ', error);
 			return client.remoteEmit('scryerError', error);
+		}
+
+		// It's possible that the client has disconnected before their data
+		// could finish being read. In that case, return early.
+
+		if (!tClients.hasOwnProperty(clientId)) {
+			console.log('client disconnected before data loaded.', clientId, scryerId);
+			return;
 		}
 
 		var goalData = {
@@ -226,7 +188,7 @@ function handleLogin(scryerId) {
 		// get updated at the end of this turn.
 		tDimension.scryers.set(scryerId, scryerData);
 
-		// Add the scryer to our goals, which gets updated in realtime.
+		// Add the goal to our goals tome, which gets updated in realtime.
 		tGoals.set(scryerId, goalData);
 
 		tGoals[scryerId].pos.on('readable', newGoalPos);
@@ -247,40 +209,21 @@ function handleLogin(scryerId) {
 	});
 }
 
-function handleRegister(name) {
+function handleRegister(data) {
+	console.log(this.id + ': register as', data);
+
+	var newScryer = Scryer.create(data);
 	var client = this;
-	var clientId = this.id;
 
-	console.log(clientId + ': register as', name);
-
-	// Let's set some random values as defaults
-	var rndX = rnd(500) + 50;
-	var rndY = rnd(400) + 50;
-
-	// This is where your scryer is born.
-	var newScryer = {
-		id: uuid.v4(),
-		lastlogin: Date.now(),
-		name: name,
-		portal: {
-			x: rndX,
-			y: rndY
-		},
-		registered: Date.now(),
-		whims: {}
-	};
-
-	var scryerId = newScryer.id;
-
-	saveScryer(scryerId, newScryer, function (error) {
+	Scryer.save(newScryer, function (error) {
 		if (error) {
 			console.log('error saving new scryer', error);
 			return client.remoteEmit('scryerError', error);
 		}
 
-		client.remoteEmit('registered', scryerId);
+		client.remoteEmit('registered', newScryer.id);
 
-		analytics.identify({ userId: scryerId, traits: { name: name } });
+		analytics.identify({ userId: newScryer.id, traits: { name: newScryer.name } });
 	});
 }
 
@@ -321,10 +264,6 @@ function isNumber (o) {
 
 var gameExpress = express();
 
-// Some handy express builtins.
-//gameExpress.use(express.favicon());
-//gameExpress.use(express.logger('dev'));
-
 // See that build in there? When the client requests the index page, we build
 // the client scripts, then serve the html.
 gameExpress.get('/', build, function (req, res) {
@@ -359,13 +298,19 @@ gameExpress.get('/audio/:audio', function (req, res) {
 var gameServer = gameExpress.listen(port, function () {
 	if (!isNumber(port)) {
 		var that = this;
+
 		// If it's a socket, we want to chmod it so nginx can see it and we
 		// also want to close the port so the sock file gets cleaned up.
+
 		require('fs').chmod(port, parseInt('777', 8));
+
 		process.on('SIGINT', that.close);
+
 		process.on('uncaughtException', function (error) {
 			that.close();
+
 			console.error(error);
+
 			process.exit(1);
 		});
 	}

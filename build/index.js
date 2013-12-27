@@ -21,8 +21,6 @@
 
 var Builder = require('component-builder');
 var fs = require('fs');
-var write = fs.writeFileSync;
-var mkdir = fs.mkdirSync;
 
 var appConfig = require('../config/');
 
@@ -32,18 +30,26 @@ module.exports = function(req, res, next) {
 	if (built) {
 		return next();
 	}
-	
+
 	var builder = new Builder('.');
 	builder.copyAssetsTo('public');
 	builder.append('window.config = ' + JSON.stringify(appConfig) + ';');
 
-	builder.build(function (err, res) {
-		if (err) return next(err);
-		if (!fs.existsSync('public')) {
-			mkdir('public');
+	builder.build(function (error, component) {
+		if (error) {
+			// Most likely, too many open files.
+			console.error(error);
+			return next();
 		}
-		write('public/' + appConfig.name + '.js', res.require + res.js);
-		built = !appConfig.developmentMode;
-		next();
+
+		fs.writeFile('public/' + appConfig.name + '.js', component.require + component.js, function (error) {
+			if (error) {
+				console.error(error);
+				return next();
+			}
+
+			built = !appConfig.developmentMode;
+			next();
+		});
 	});
 };

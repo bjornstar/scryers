@@ -69,6 +69,7 @@ div.whim {
   -moz-transition: -moz-transform 1s linear, opacity 1s;
   -ms-transition: -ms-transform 1s linear, opacity 1s;
   -o-transition: -o-transform 1s linear, opacity 1s;
+  transition: transform 1s linear, opacity 1s;
 }
 
 div.slime {
@@ -85,7 +86,19 @@ div.portal, div.goal {
 	width: 100px;
 	height: 100px;
 	margin-left: -50px;
-	margin-top: -85px;
+	margin-top: -50px;
+}
+
+div.container {
+	position: absolute;
+	width: 0;
+	height: 0;
+	opacity: 0;
+	-webkit-transition: opacity 1s;
+	-moz-transition: opacity 1s;
+	-ms-transition: opacity 1s;
+	-o-transition: opacity 1s;
+	transition: opacity 1s;
 }
 
 div.nametag {

@@ -45,8 +45,8 @@ function Portal(portal, view) {
 	var name = portal.getParent().name.valueOf();
 
 	var cnt = this.rootElement = document.createElement('div');
-	cnt.id = portal.getParent().id.valueOf();
-	cnt.className = 'portalContainer';
+	cnt.id = portal.getParent().getKey();
+	cnt.className = 'container';
 	transform(cnt, position);
 
 	// Create the portal.
@@ -100,24 +100,20 @@ Portal.prototype.update = function () {
 Portal.prototype.destroy = function () {
 	// We fade out the portal by setting the opacity to 0.
 	var cnt = this.rootElement;
-	cnt.style.opacity = 0;
 
 	function removePortal(e) {
 		// We might have multiple transitions, the one we want to pay attention
 		// to is the one for opacity.
 
-		if (e.propertyName !== 'opacity') {
-			return;
+		if (e.propertyName === 'opacity') {
+			cnt.parentNode.removeChild(cnt);
 		}
-
-		var view = cnt.parentNode;
-		view.removeChild(cnt);
-
-		e.stopPropagation();
 	}
 
 	// and when the opacity reaches 0 we remove the portal from the dimension.
 	onEnd(cnt, removePortal);
+
+	cnt.style.opacity = 0;
 };
 
 module.exports = Portal;
