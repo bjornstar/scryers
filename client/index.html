@@ -14,26 +14,18 @@
       <div> </div>
     </div>
     <div id="Welcome">
-      <h1>scryers</h1>
-      <div id="startOver">start over</div>
-      <ul id="catTypes">
-        <p>Please choose your cat:</p>
-        <li><img src="/images/slime.png" id="c1" class="catType" /></li>
-      </ul>
-      <ul id="propTypes">
-        <p>Please choose an accessory:</p>
-        <li><img src="/images/slime.png" id="a1" class="propType" /></li>
-      </ul>
+      <h1>Scryers</h1>
       <div id="nameDiv">
-        <div id="yourCat"> </div>
         <p>
-          <label for="name">Choose a name for your cat: </label>
-          <input type="text" id="name" name="name" />
-          <input type="submit" id="register" name="register" value="Register" />
+          <form id="registration">
+            <label for="name">What's your name? </label>
+            <input type="text" id="name" name="name" />
+            <input type="submit" id="register" name="register" value="Register" />
+          </form>
         </p>
       </div>
       <p id="registrationError"></p>
     </div>
-    <input id="chat" placeholder="meow" />
+    <input id="chat" placeholder="type to chat" />
   </body>
 </html>

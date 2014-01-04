@@ -25,13 +25,15 @@ function transform(what, how) {
 	what.style.webkitTransform = how;
 	what.style.msTransform = how;
 	what.style.oTransform = how;
+	what.style.mozTransform = how;
 }
 
 function onEnd(what, then) {
-	what.addEventListener('transitionEnd', then);
+	what.addEventListener('transitionend', then);
 	what.addEventListener('webkitTransitionEnd', then);
 	what.addEventListener('msTransitionEnd', then);
 	what.addEventListener('oTransitionEnd', then);
+	what.addEventListener('mozTransitionEnd', then);
 }
 
 function Portal(portal, view) {
@@ -45,7 +47,6 @@ function Portal(portal, view) {
 	var name = portal.getParent().name.valueOf();
 
 	var cnt = this.rootElement = document.createElement('div');
-	cnt.id = portal.getParent().getKey();
 	cnt.className = 'container';
 	transform(cnt, position);
 
@@ -68,18 +69,32 @@ function Portal(portal, view) {
 
 	view.appendChild(cnt);
 
+	var that = this;
+
+	var destroyed = false;
+
+	portal.once('destroy', function () {
+		destroyed = true;
+		that.destroy();
+	});
+
+	function removePortal(e) {
+		// Unfortunately Mozilla is a giant pile of garbage and doesn't
+		// reliably animate anything.
+
+		if (destroyed) {
+			cnt.parentNode.removeChild(cnt);
+		}
+	}
+
+	onEnd(cnt, removePortal);
+
 	// We want the portal to fade in. The default opacity of a portal is 0, we
 	// use setTimeout to trigger a transition.
 
 	setTimeout(function () {
 		cnt.style.opacity = 1;
 	}, 0);
-
-	var that = this;
-
-	portal.on('destroy', function () {
-		that.destroy();
-	});
 }
 
 Portal.prototype.update = function () {
@@ -101,18 +116,7 @@ Portal.prototype.destroy = function () {
 	// We fade out the portal by setting the opacity to 0.
 	var cnt = this.rootElement;
 
-	function removePortal(e) {
-		// We might have multiple transitions, the one we want to pay attention
-		// to is the one for opacity.
-
-		if (e.propertyName === 'opacity') {
-			cnt.parentNode.removeChild(cnt);
-		}
-	}
-
 	// and when the opacity reaches 0 we remove the portal from the dimension.
-	onEnd(cnt, removePortal);
-
 	cnt.style.opacity = 0;
 };
 

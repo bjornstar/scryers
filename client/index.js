@@ -28,13 +28,13 @@
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
 
-require('tome-log');
+//require('tome-log');
 
 // We can require Tomes thanks to component.
 var Tome = require('tomes').Tome;
 
 // These are our global variables.
-var merging, catSelect, view;
+var merging, welcome, view;
 
 var myScryerId = window.localStorage.getItem('scryerId');
 var myGoals;
@@ -116,20 +116,24 @@ function finishLogin() {
 	myGoals.on('readable', handleMeReadable);
 	myGoals.on('destroy', handleMeDestroy);
 
-	catSelect.hide();
+	welcome.hide();
 
 	view.setRef(myGoals);
 }
 
 var watchForMyGoals = tGoals.on('add', function (id) {
-	if (!myScryerId && id !== myScryerId) {
+	if (!myScryerId || id !== myScryerId) {
 		return;
 	}
 
 	tGoals.removeListener('add', watchForMyGoals);
-
 	finishLogin();
 });
+
+function login() {
+	console.log('sending login:' + myScryerId);
+	sm.remoteEmit('login', myScryerId);
+}
 
 function handleRegistered(scryerId) {
 	window.localStorage.setItem('scryerId', scryerId);
@@ -209,11 +213,6 @@ function handleGoalsDiff(diff) {
 	merging = false;
 }
 
-function login() {
-	console.log('sending login:' + myScryerId);
-	sm.remoteEmit('login', myScryerId);
-}
-
 function register(name) {
 	// Register our scryer's details. The server will either emit an error. On
 	// success, the server will emit our scryerId.
@@ -227,9 +226,9 @@ function register(name) {
 function contentLoaded() {
 	// The page has loaded completely, we can start.
 
-	catSelect = require('./catselect').CatSelect();
+	welcome = require('./welcome').Welcome();
 
-	catSelect.on('register', register);
+	welcome.on('register', register);
 
 	// Look at our URL and see if we want CSS or Canvas
 	if (window.location.href.match(/#canvas/i)) {
@@ -260,7 +259,7 @@ function contentLoaded() {
 
 	sm.on('registered', handleRegistered);
 
-	sm.on('scryerError', catSelect.showError);
+	sm.on('scryerError', welcome.showError);
 }
 
 // Listen for the page to indicate that it's ready.

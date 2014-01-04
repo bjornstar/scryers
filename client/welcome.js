@@ -19,89 +19,32 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-//    ___      _   __      _           _
-//   / __\__ _| |_/ _\ ___| | ___  ___| |_
-//  / /  / _` | __\ \ / _ \ |/ _ \/ __| __|
-// / /__| (_| | |__\ \  __/ |  __/ (__| |_
-// \____/\__,_|\__\__/\___|_|\___|\___|\__|
-//
 
 var EventEmitter = require('emitter');
 
 exports = module.exports = new EventEmitter();
 
-exports.CatSelect = function () {
-	var catTypes = document.getElementById('catTypes');
-	var propTypes = document.getElementById('propTypes');
+exports.Welcome = function () {
 	var nameDiv = document.getElementById('nameDiv');
 	var name = document.getElementById('name');
-	var yourCat = document.getElementById('yourCat');
-	var startOver = document.getElementById('startOver');
-	var propImg;
 
-	startOver.addEventListener('mouseup', function () {
-		catTypes.style.display = '';
-		propTypes.style.display = 'none';
-		nameDiv.style.display = 'none';
-		if (propImg) {
-			yourCat.removeChild(propImg);
-			propImg = undefined;
-		}
-	});
-
-	var catType, propType;
-
-	catTypes.addEventListener('mouseup', function (e) {
-		catType = e.target.id;
-
-		catTypes.style.display = 'none';
-
-		propTypes.className = catType;
-		propTypes.style.display = 'block';
-	});
-
-	propTypes.addEventListener('mouseup', function (e) {
-		propType = e.target.id;
-
-		propTypes.style.display = 'none';
-
-		nameDiv.className = catType + ' ' + propType;
-		nameDiv.style.display = 'block';
-
-		propImg = new Image();
-		propImg.src = '/images/' + propType + '.png';
-		yourCat.appendChild(propImg);
-
-		name.focus();
-	});
+	nameDiv.style.display = 'block';
+	name.focus();
 
 	function attemptRegister(name) {
 		exports.hideError();
 		exports.emit('register', name);
 	}
 
-	// Listen for return.
-	name.addEventListener('keydown', function (e) {
-		var nameString = name.value;
-
-		// If it's return and we have some text, register with that name.
-		if (e.keyCode === 13 && nameString.length) {
-			attemptRegister(nameString);
-		}
-	});
-
-
 	var registerButton = document.getElementById('register');
 
 	registerButton.addEventListener('click', function (e) {
 		var nameString = name.value;
 
-		// If we don't have any text, do nothing.
-		if (!nameString.length) {
-			return;
+		// If we have text, try to register.
+		if (nameString.length) {
+			attemptRegister(nameString);
 		}
-
-		attemptRegister(nameString);
 
 		e.preventDefault();
 		e.stopPropagation();
@@ -133,11 +76,9 @@ exports.hide = function() {
 };
 
 exports.showError = function (error) {
-	console.error(error);
-
 	// Set the registrationError text
 	var registrationError = document.getElementById('registrationError');
-	registrationError.textContent = error;
+	registrationError.textContent = JSON.stringify(error);
 
 	exports.show();
 };
