@@ -52,11 +52,7 @@ var sm = require('sockMonger');
 
 function handleOpen() {
 	console.log('The portal is opening...');
-	if (myScryerId) {
-		login();
-	} else {
-		console.log('You must be new here, what\'s your name?');
-	}
+	login(myScryerId);
 }
 
 sm.on('open', handleOpen);
@@ -109,6 +105,12 @@ function handleMeReadable() {
 	sm.remoteEmit('diff', diff);
 }
 
+function handleLoggedIn(scryerId) {
+	console.log('loggedin', scryerId);
+	window.localStorage.setItem('scryerId', scryerId);
+	myScryerId = scryerId;
+}
+
 function finishLogin() {
 	myGoals = tGoals[myScryerId];
 
@@ -130,16 +132,9 @@ var watchForMyGoals = tGoals.on('add', function (id) {
 	finishLogin();
 });
 
-function login() {
-	console.log('sending login:' + myScryerId);
-	sm.remoteEmit('login', myScryerId);
-}
-
-function handleRegistered(scryerId) {
-	window.localStorage.setItem('scryerId', scryerId);
-	myScryerId = scryerId;
-
-	login();
+function login(id) {
+	console.log('sending login:' + id);
+	sm.remoteEmit('login', id);
 }
 
 function addScryer(scryerId) {
@@ -257,7 +252,7 @@ function contentLoaded() {
 	sm.on('goals', handleGoalsData);
 	sm.on('goals.diff', handleGoalsDiff);
 
-	sm.on('registered', handleRegistered);
+	sm.on('loggedIn', handleLoggedIn);
 
 	sm.on('scryerError', welcome.showError);
 }

@@ -1,7 +1,7 @@
 {
     "name": "scryers",
     "description": "You start with fire.",
-    "version": "0.0.13",
+    "version": "0.0.14",
     "author": "Bjorn Stromberg <bjorn@bjornstar.com>",
     "maintainers": [
         { "name": "Bjorn Stromberg", "email": "bjorn@bjornstar.com" }

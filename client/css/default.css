@@ -28,6 +28,9 @@ a {
   left: 40px;
   z-index: 20;
 }
+#Welcome h1 {
+	padding-bottom: 10px;
+}
 #blocker {
   background-color: #000;
   position: fixed;

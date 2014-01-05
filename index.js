@@ -32,7 +32,6 @@ var Tome = require('tomes').Tome;
 
 var appConfig = require('./config/');
 var build = require('./build/');
-var analytics = require('./analytics/');
 var move = require('./lib/move');
 var SockMonger = require('./lib/sockMonger');
 var Scryer = require('./lib/scryer');
@@ -45,8 +44,8 @@ var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
 var tGoals = Tome.conjure({});
 
-var tClients = Tome.conjure({});
-var scryerClientMap = {};
+var scryers = {};
+
 var newThisTurn = {};
 
 var merging;
@@ -72,28 +71,10 @@ function delClient(clientId) {
 	console.log(clientId + ' disconnected.');
 
 	delete newThisTurn[clientId];
-
-	// Delete the client from the map, triggering the removal of the player
-	// from the dimension.
-	var scryerId = tClients[clientId];
-
-	if (!scryerId) {
-		return;
-	}
-
-	delete scryerClientMap[scryerId];
-
-	tClients.del(clientId);
 }
 
 function mergeGoal(diff) {
 	var clientId = this.id;
-
-	// If we got a diff from a strange client, just ignore it.
-	if (!tClients[clientId].is()) {
-		console.log('Invalid client:', clientId)
-		return;
-	}
 
 	if (!diff) {
 		console.log('empty diff');
@@ -134,97 +115,74 @@ function newGoalPos() {
 	}
 }
 
-function logout(scryerId) {
-	tDimension.scryers[scryerId].set('lastlogout', Date.now());
-
-	Scryer.save(tDimension.scryers[scryerId], function(error) {
-		if (error) {
-			console.log('error saving:', scryerId, error)
-		}
-
-		tDimension.scryers.del(scryerId);
-		tGoals.del(scryerId);
-
-		analytics.track({ userId: scryerId, event: 'disconnected' });
-	});
-}
-
 function handleLogin(scryerId) {
 	var client = this;
-	var clientId = this.id;
 
-	var currentClient = scryerClientMap[scryerId]
+	// The first thing we do is check to see if that scryer is already logged
+	// in.
+	var clientId = client.id;
 
-	if (currentClient) {
-		console.log(clientId, 'took over', currentClient);
-		scryerClientMap[scryerId] = clientId;
-		tClients.move(currentClient, clientId);
-		sm.clients[currentClient].close();
-		return;
+	if (scryers.hasOwnProperty(scryerId)) {
+		console.log(scryerId, ' is already logged in');
+		return client.remoteEmit('scryerError', 'alreadyLoggedIn');
 	}
 
-	Scryer.load(scryerId, function (error, scryerData) {
+	var scryer = new Scryer(scryerId);
+
+	scryer.once('ready', loggedIn);
+
+	function loggedIn(error) {
+		if (!sm.clients.hasOwnProperty(clientId)) {
+			return console.log('client disconnected before data loaded.', clientId, scryerId);
+		}
+
 		if (error) {
-			console.log('error: ', error);
+			console.error('error logging in:', error);
 			return client.remoteEmit('scryerError', error);
 		}
 
-		// It's possible that the client has disconnected before their data
-		// could finish being read. In that case, return early.
+		var scryerId = scryer.data.id;
 
-		if (!tClients.hasOwnProperty(clientId)) {
-			console.log('client disconnected before data loaded.', clientId, scryerId);
-			return;
-		}
+		// Tell the client who is logging in what their scryerId is.
+		client.remoteEmit('loggedIn', scryerId);
+
+		scryers[scryerId] = scryer;
+
+		var publicData = scryer.data.public;
 
 		var goalData = {
-			pos: scryerData.portal
+			pos: publicData.portal
 		};
 
 		// Sneakily bump the lastseen before it gets turned into a tome.
-		scryerData.lastlogin = Date.now();
+		publicData.lastlogin = Date.now();
 
 		// Add the scryer to our scryers tome and all clients will automagically
 		// get updated at the end of this turn.
-		tDimension.scryers.set(scryerId, scryerData);
+		tDimension.scryers.set(scryerId, publicData);
 
 		// Add the goal to our goals tome, which gets updated in realtime.
 		tGoals.set(scryerId, goalData);
 
 		tGoals[scryerId].pos.on('readable', newGoalPos);
 
-		// Map the scryerId to clientId so we know which client belongs to which
-		// scryer.
-		tClients[clientId].assign(scryerId);
-
-		tClients[clientId].on('destroy', function () {
+		client.once('close', function () {
 			console.log(clientId, 'disconnected. logging out', scryerId, '.');
-			logout(scryerId);
+
+			delete scryers[scryerId];
+
+			tDimension.scryers[scryerId].set('lastlogout', Date.now());
+
+			scryer.save(function(error) {
+				if (error) {
+					console.log('error saving:', scryerId, error)
+				}
+
+				tDimension.scryers.del(scryerId);
+				tGoals.del(scryerId);
+			});
 		});
-
-		scryerClientMap[scryerId] = clientId;
-
-		// And tell the client who is logging in what their scryerId is.
-		client.remoteEmit('loggedIn', scryerId);
-	});
-}
-
-function handleRegister(data) {
-	console.log(this.id + ': register as', data);
-
-	var newScryer = Scryer.create(data);
-	var client = this;
-
-	Scryer.save(newScryer, function (error) {
-		if (error) {
-			console.log('error saving new scryer', error);
-			return client.remoteEmit('scryerError', error);
-		}
-
-		client.remoteEmit('registered', newScryer.id);
-
-		analytics.identify({ userId: newScryer.id, traits: { name: newScryer.name } });
-	});
+	}
 }
 
 function addClient(clientId) {
@@ -232,9 +190,13 @@ function addClient(clientId) {
 
 	newThisTurn[clientId] = tDimension.getVersion();
 
-	tClients.set(clientId, '');
-
 	var client = sm.clients[clientId];
+
+	// On diff, the client sent us a change to their goal.
+	client.on('diff', mergeGoal);
+
+	// On login, the client is trying to login.
+	client.on('login', handleLogin);
 
 	// When a client connects, we send them a copy of the dimension. This is
 	// synchronized once per turn.
@@ -243,15 +205,6 @@ function addClient(clientId) {
 	// We also send them the goals tome. This is synchronized in realtime and
 	// is how scryers can influence the dimension.
 	client.remoteEmit('goals', tGoals);
-
-	// On diff, the client sent us a change to their goal.
-	client.on('diff', mergeGoal);
-
-	// On login, the client is trying to login.
-	client.on('login', handleLogin);
-
-	// On register, the client needs to create an account.
-	client.on('register', handleRegister);
 }
 
 function isNumber (o) {
