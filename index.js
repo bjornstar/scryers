@@ -44,8 +44,6 @@ var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
 var tGoals = Tome.conjure({});
 
-var scryers = {};
-
 var newThisTurn = {};
 
 var merging;
@@ -115,23 +113,62 @@ function newGoalPos() {
 	}
 }
 
+function login(client, scryer) {
+	var clientId = client.id;
+	var scryerId = scryer.data.id;
+
+	var publicData = scryer.data.public;
+
+	var goalData = {
+		pos: publicData.portal
+	};
+
+	// Sneakily bump the lastseen before it gets turned into a tome.
+	publicData.lastlogin = Date.now();
+
+	// Add the scryer to our scryers tome and all clients will automagically
+	// get updated at the end of this turn.
+	tDimension.scryers.set(scryerId, publicData);
+
+	// Add the goal to our goals tome, which gets updated in realtime.
+	tGoals.set(scryerId, goalData);
+
+	tGoals[scryerId].pos.on('readable', newGoalPos);
+
+	client.once('close', function () {
+		console.log(clientId, 'disconnected. logging out', scryerId, '.');
+
+		tDimension.scryers[scryerId].set('lastlogout', Date.now());
+
+		scryer.save(function(error) {
+			if (error) {
+				console.log('error saving:', scryerId, error)
+			}
+
+			tDimension.scryers.del(scryerId);
+			tGoals.del(scryerId);
+		});
+	});
+
+	// Tell the client who is logging in what their scryerId is.
+	client.remoteEmit('loggedIn', scryerId);
+}
+
 function handleLogin(scryerId) {
 	var client = this;
+	var clientId = client.id;
 
 	// The first thing we do is check to see if that scryer is already logged
 	// in.
-	var clientId = client.id;
 
-	if (scryers.hasOwnProperty(scryerId)) {
+	if (tDimension.scryers.hasOwnProperty(scryerId)) {
 		console.log(scryerId, ' is already logged in');
 		return client.remoteEmit('scryerError', 'alreadyLoggedIn');
 	}
 
 	var scryer = new Scryer(scryerId);
 
-	scryer.once('ready', loggedIn);
-
-	function loggedIn(error) {
+	scryer.once('ready', function (error) {
 		if (!sm.clients.hasOwnProperty(clientId)) {
 			return console.log('client disconnected before data loaded.', clientId, scryerId);
 		}
@@ -141,48 +178,8 @@ function handleLogin(scryerId) {
 			return client.remoteEmit('scryerError', error);
 		}
 
-		var scryerId = scryer.data.id;
-
-		// Tell the client who is logging in what their scryerId is.
-		client.remoteEmit('loggedIn', scryerId);
-
-		scryers[scryerId] = scryer;
-
-		var publicData = scryer.data.public;
-
-		var goalData = {
-			pos: publicData.portal
-		};
-
-		// Sneakily bump the lastseen before it gets turned into a tome.
-		publicData.lastlogin = Date.now();
-
-		// Add the scryer to our scryers tome and all clients will automagically
-		// get updated at the end of this turn.
-		tDimension.scryers.set(scryerId, publicData);
-
-		// Add the goal to our goals tome, which gets updated in realtime.
-		tGoals.set(scryerId, goalData);
-
-		tGoals[scryerId].pos.on('readable', newGoalPos);
-
-		client.once('close', function () {
-			console.log(clientId, 'disconnected. logging out', scryerId, '.');
-
-			delete scryers[scryerId];
-
-			tDimension.scryers[scryerId].set('lastlogout', Date.now());
-
-			scryer.save(function(error) {
-				if (error) {
-					console.log('error saving:', scryerId, error)
-				}
-
-				tDimension.scryers.del(scryerId);
-				tGoals.del(scryerId);
-			});
-		});
-	}
+		login(client, scryer);
+	});
 }
 
 function addClient(clientId) {
@@ -209,10 +206,10 @@ function addClient(clientId) {
 
 function isNumber (o) {
 	// For checking if the port is a number or a file.
-	if (typeof o === 'number' || parseInt(o, 10) == o) {
-		return true;
+	if (!isFinite(o) || parseFloat(o).toString() !== o.toString()) {
+		return false;
 	}
-	return false;
+	return true;
 }
 
 var gameExpress = express();

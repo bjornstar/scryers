@@ -52,7 +52,9 @@ var sm = require('sockMonger');
 
 function handleOpen() {
 	console.log('The portal is opening...');
-	login(myScryerId);
+	if (myScryerId) {
+		login(myScryerId);
+	}
 }
 
 sm.on('open', handleOpen);
@@ -109,10 +111,19 @@ function handleLoggedIn(scryerId) {
 	console.log('loggedin', scryerId);
 	window.localStorage.setItem('scryerId', scryerId);
 	myScryerId = scryerId;
+	finishLogin();
 }
 
+var watchForMyGoals = tGoals.on('add', finishLogin);
+
 function finishLogin() {
+	if (!myScryerId || !tGoals[myScryerId]) {
+		return;
+	}
+
 	myGoals = tGoals[myScryerId];
+
+	tGoals.removeListener('add', watchForMyGoals);
 
 	// Set up a listener for changes to our goals.
 	myGoals.on('readable', handleMeReadable);
@@ -122,15 +133,6 @@ function finishLogin() {
 
 	view.setRef(myGoals);
 }
-
-var watchForMyGoals = tGoals.on('add', function (id) {
-	if (!myScryerId || id !== myScryerId) {
-		return;
-	}
-
-	tGoals.removeListener('add', watchForMyGoals);
-	finishLogin();
-});
 
 function login(id) {
 	console.log('sending login:' + id);
@@ -208,14 +210,10 @@ function handleGoalsDiff(diff) {
 	merging = false;
 }
 
-function register(name) {
-	// Register our scryer's details. The server will either emit an error. On
-	// success, the server will emit our scryerId.
-
-	var data = { name: name };
-
-	console.log('emitting register:', data);
-	sm.remoteEmit('register', data);
+function register() {
+	// Login as create to get a new scryer.
+	console.log('emitting login:', 'create');
+	sm.remoteEmit('login', 'create');
 }
 
 function contentLoaded() {
@@ -258,4 +256,4 @@ function contentLoaded() {
 }
 
 // Listen for the page to indicate that it's ready.
-document.addEventListener("DOMContentLoaded", contentLoaded);
+document.addEventListener('DOMContentLoaded', contentLoaded);
