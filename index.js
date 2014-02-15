@@ -39,7 +39,7 @@ var Scryer = require('./lib/scryer');
 // Heroku uses PORT
 // AppFog uses VCAP_APP_PORT
 
-var port = process.env.PORT || process.env.VCAP_APP_PORT || 3000;
+var port = process.env.PORT || process.env.VCAP_APP_PORT || appConfig.port || 3000;
 
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
 var tGoals = Tome.conjure({});
