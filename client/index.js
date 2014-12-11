@@ -42,13 +42,10 @@ var myGoals;
 var tDimension = Tome.conjure({});
 var tGoals = Tome.conjure({});
 
-// In development mode we stick em on the window for easy access.
-if (window.config.developmentMode) {
-	window.dimension = tDimension;
-	window.goals = tGoals;
-}
+window.dimension = tDimension;
+window.goals = tGoals;
 
-var sm = require('sockMonger');
+var sm = require('./lib/sockMonger');
 
 function handleOpen() {
 	console.log('The portal is opening...');

@@ -19,18 +19,42 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-var Builder = require('component-builder');
+var build = require('component-builder');
+var resolve = require('component-resolver');
 var fs = require('fs');
 
 var appConfig = require('../config/');
 
 var built = false;
 
-module.exports = function(req, res, next) {
+module.exports = function (req, res, next) {
 	if (built) {
 		return next();
 	}
 
+	resolve(process.cwd(), { install: true }, function (error, tree) {
+		if (error) {
+			console.error(error);
+			return next();
+		}
+		build.scripts(tree).use('scripts', build.plugins.js()).end(function (error, string) {
+			if (error) {
+				console.error(error);
+				return next();
+			}
+			var cfg = 'window.config = ' + JSON.stringify(appConfig) + ';';
+			fs.writeFile('public/' + appConfig.name + '.js', build.scripts.require + string + cfg, function (error) {
+				if (error) {
+					console.error(error);
+					return next();
+				}
+
+				built = true;
+				next();
+			});
+		});
+	});
+/*
 	var builder = new Builder('.');
 	builder.copyAssetsTo('public');
 	builder.append('window.config = ' + JSON.stringify(appConfig) + ';');
@@ -52,4 +76,5 @@ module.exports = function(req, res, next) {
 			next();
 		});
 	});
+*/
 };

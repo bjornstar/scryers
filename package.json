@@ -1,7 +1,7 @@
 {
     "name": "scryers",
     "description": "You start with fire.",
-    "version": "0.0.15",
+    "version": "0.1.0",
     "author": "Bjorn Stromberg <bjorn@bjornstar.com>",
     "maintainers": [
         { "name": "Bjorn Stromberg", "email": "bjorn@bjornstar.com" }
@@ -13,11 +13,12 @@
     "dependencies": {
         "component": "*",
         "component-builder": "*",
+        "component-resolver": "*",
         "express": "*",
         "node-uuid": "*",
         "ws": "*",
         "tome-log": "*",
-        "tomes": ">=0.0.18"
+        "tomes": "0.1.0"
     },
     "optionalDependencies": {
         "analytics-node": "*",

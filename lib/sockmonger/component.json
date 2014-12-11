@@ -1,7 +1,7 @@
 {
-	"name": "sockMonger",
+	"name": "sockmonger",
 	"description": "eventy websockets",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"dependencies": {
 		"component/emitter": "*"
 	},

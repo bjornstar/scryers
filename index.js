@@ -28,12 +28,13 @@
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
 var express = require('express');
+var path = require('path');
 var Tome = require('tomes').Tome;
 
 var appConfig = require('./config/');
 var build = require('./build/');
 var move = require('./lib/move');
-var SockMonger = require('./lib/sockMonger');
+var SockMonger = require('./lib/sockmonger');
 var Scryer = require('./lib/scryer');
 
 // Heroku uses PORT
@@ -217,31 +218,31 @@ var gameExpress = express();
 // See that build in there? When the client requests the index page, we build
 // the client scripts, then serve the html.
 gameExpress.get('/', build, function (req, res) {
-	res.sendfile('./client/index.html');
+	res.sendFile(path.resolve('./client/index.html'));
 });
 
 // The built client javascript files end up here.
 gameExpress.get('/js/:js', function (req, res) {
 	var js = req.params.js
-	res.sendfile('./public/' + js);
+	res.sendFile(path.resolve('./public/' + js));
 });
 
 // CSS files served from /client/css
 gameExpress.get('/css/:css', function (req, res) {
 	var css = req.params.css;
-	res.sendfile('./client/css/' + css);
+	res.sendFile(path.resolve('./client/css/' + css));
 });
 
 // Images served from /client/images
 gameExpress.get('/images/:image', function (req, res) {
 	var image = req.params.image;
-	res.sendfile('./client/images/' + image);
+	res.sendFile(path.resolve('./client/images/' + image));
 });
 
 // Audio files served from /client/audio
 gameExpress.get('/audio/:audio', function (req, res) {
 	var audio = req.params.audio;
-	res.sendfile('./client/audio/' + audio);
+	res.sendFile(path.resolve('./client/audio/' + audio));
 });
 
 // This starts our express web server listening on either a port or a socket.
