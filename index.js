@@ -27,20 +27,20 @@
 //  _____| ||     |_ |   |  | |  |   |  |   |___ |   |  | | _____| |
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
+
 var express = require('express');
+var HtmlWebpackPlugin = require('html-webpack-plugin');
 var path = require('path');
-var Tome = require('tomes').Tome;
+var Tome = require('@bjornstar/tomes');
+var webpack = require('webpack');
+var webpackDevMiddleware = require('webpack-dev-middleware');
 
 var appConfig = require('./config/');
-var build = require('./build/');
 var move = require('./lib/move');
 var SockMonger = require('./lib/sockmonger');
 var Scryer = require('./lib/scryer');
 
-// Heroku uses PORT
-// AppFog uses VCAP_APP_PORT
-
-var port = process.env.PORT || process.env.VCAP_APP_PORT || appConfig.port || 3000;
+var port = appConfig.port || 3000;
 
 var tDimension = Tome.conjure({ turn: 0, scryers: {} });
 var tGoals = Tome.conjure({});
@@ -99,18 +99,20 @@ function newGoalPos() {
 	var scryerId = this.getParent().getKey();
 	var scryer = tDimension.scryers[scryerId];
 
-	for (var whimId in scryer.whims) {
-		if (scryer.whims.hasOwnProperty(whimId)) {
-			var whim = scryer.whims[whimId];
-			moving[whimId] = { pos: whim.pos, goal: this, speed: whim.speed };
+	var whimIds = Object.keys(scryer.whims);
 
-			// If our whim gets deleted while it's moving, we need to remove it
-			// from the moving list.
+	for (var i = 0; i < whimIds.length; i += 1) {
+		var whimId = whimIds[i];
+		var whim = scryer.whims[whimId];
 
-			whim.on('destroy', function () {
-				delete moving[whimId];
-			});
-		}
+		moving[whimId] = { pos: whim.pos, goal: this, speed: whim.speed };
+
+		// If our whim gets deleted while it's moving, we need to remove it
+		// from the moving list.
+
+		whim.on('destroy', function () {
+			delete moving[whimId];
+		});
 	}
 }
 
@@ -205,69 +207,42 @@ function addClient(clientId) {
 	client.remoteEmit('goals', tGoals);
 }
 
-function isNumber (o) {
-	// For checking if the port is a number or a file.
-	if (!isFinite(o) || parseFloat(o).toString() !== o.toString()) {
-		return false;
-	}
-	return true;
-}
+var webpackOptions = {
+	context: path.resolve(__dirname, 'client'),
+	entry: {
+		index: './index.js'
+	},
+	module: {
+		rules: [
+			{
+				loader: 'file-loader',
+				query: {
+					name: '[path][name].[ext]'
+				},
+				test: /\.(css|html|png)$/
+			}
+		]
+	},
+	plugins: [
+		new HtmlWebpackPlugin({
+			filename: './index.html',
+			template: './index.ejs'
+		})
+	]
+};
+
+var webpackDevOptions = {
+	index: 'index.html'
+};
 
 var gameExpress = express();
-
-// See that build in there? When the client requests the index page, we build
-// the client scripts, then serve the html.
-gameExpress.get('/', build, function (req, res) {
-	res.sendFile(path.resolve('./client/index.html'));
-});
-
-// The built client javascript files end up here.
-gameExpress.get('/js/:js', function (req, res) {
-	var js = req.params.js
-	res.sendFile(path.resolve('./public/' + js));
-});
-
-// CSS files served from /client/css
-gameExpress.get('/css/:css', function (req, res) {
-	var css = req.params.css;
-	res.sendFile(path.resolve('./client/css/' + css));
-});
-
-// Images served from /client/images
-gameExpress.get('/images/:image', function (req, res) {
-	var image = req.params.image;
-	res.sendFile(path.resolve('./client/images/' + image));
-});
-
-// Audio files served from /client/audio
-gameExpress.get('/audio/:audio', function (req, res) {
-	var audio = req.params.audio;
-	res.sendFile(path.resolve('./client/audio/' + audio));
-});
+gameExpress.use(webpackDevMiddleware(webpack(webpackOptions), webpackDevOptions));
 
 // This starts our express web server listening on either a port or a socket.
-var gameServer = gameExpress.listen(port, function () {
-	if (!isNumber(port)) {
-		var that = this;
-
-		// If it's a socket, we want to chmod it so nginx can see it and we
-		// also want to close the port so the sock file gets cleaned up.
-
-		require('fs').chmod(port, parseInt('777', 8));
-
-		process.on('SIGINT', that.close);
-
-		process.on('uncaughtException', function (error) {
-			that.close();
-
-			console.error(error);
-
-			process.exit(1);
-		});
-	}
-});
+var gameServer = gameExpress.listen(port);
 
 var sm = new SockMonger({ server: gameServer });
+
 sm.on('add', addClient);
 sm.on('del', delClient);
 

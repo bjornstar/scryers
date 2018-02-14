@@ -26,11 +26,11 @@
 //  \___\__,_|_| |_|\_/ \__,_|___/ \_/ |_|\___| \_/\_/
 //
 
-var EventEmitter = require('emitter');
-var inherits = require('inherit');
+var EventEmitter = require('events').EventEmitter;
+var inherits = require('util').inherits;
 var raf = require('raf');
-var Tween = require('tween');
-var Tome = require('tomes').Tome;
+var Tween = require('component-tween');
+var Tome = require('@bjornstar/tomes');
 
 var id = 0;
 var sprite = { width: 100, height: 91 };
@@ -133,7 +133,7 @@ function updateOffset(view) {
 
 function resizeCanvas(view) {
 	var canvas = view.canvas;
-	
+
 	canvas.width = Math.min(view.map.width, window.innerWidth);
 	canvas.height = Math.min(view.map.height, window.innerHeight);
 
@@ -201,7 +201,7 @@ function createCatTween(view, cat) {
 		.duration(500)
 		.ease('in-out-sine')
 		.update(updateCat);
-	
+
 	tween.on('end', function () {
 		delete catTweens[name];
 	});
@@ -248,7 +248,7 @@ function CanvasView(map, ref) {
 
 		var newX = Math.max(Math.min(dX, that.map.width - sprite.width / 2), sprite.width / 2);
 		var newY = Math.max(Math.min(dY, that.map.height - sprite.height / 2 + 6), sprite.width / 2);
-		
+
 		that.emit('newCoords', newX, newY);
 	});
 

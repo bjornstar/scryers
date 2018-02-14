@@ -28,10 +28,11 @@
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
 
-//require('tome-log');
+require('file-loader?emit=false&name=[name].[ext]!./css/default.css');
+require('file-loader?emit=false&name=[name].[ext]!./images/grid-100x100.png');
 
-// We can require Tomes thanks to component.
-var Tome = require('tomes').Tome;
+var Tome = require('@bjornstar/tomes');
+var sm = require('../lib/sockmonger/client.js');
 
 // These are our global variables.
 var merging, welcome, view;
@@ -45,8 +46,6 @@ var tGoals = Tome.conjure({});
 window.dimension = tDimension;
 window.goals = tGoals;
 
-var sm = require('./lib/sockMonger');
-
 function handleOpen() {
 	console.log('The portal is opening...');
 	if (myScryerId) {
@@ -54,6 +53,11 @@ function handleOpen() {
 	}
 }
 
+function handleClose () {
+	console.log('closed');
+}
+
+sm.on('close', handleClose);
 sm.on('open', handleOpen);
 
 // This is our click handler.
@@ -111,16 +115,12 @@ function handleLoggedIn(scryerId) {
 	finishLogin();
 }
 
-var watchForMyGoals = tGoals.on('add', finishLogin);
-
 function finishLogin() {
 	if (!myScryerId || !tGoals[myScryerId]) {
 		return;
 	}
 
 	myGoals = tGoals[myScryerId];
-
-	tGoals.removeListener('add', watchForMyGoals);
 
 	// Set up a listener for changes to our goals.
 	myGoals.on('readable', handleMeReadable);
@@ -130,6 +130,8 @@ function finishLogin() {
 
 	view.setRef(myGoals);
 }
+
+tGoals.once('add', finishLogin);
 
 function login(id) {
 	console.log('sending login:' + id);
@@ -164,10 +166,11 @@ function handleDimensionData(data) {
 
 	// Go through the list of scryers in the dimension and add them to our
 	// dimension.
-	for (var scryerId in tDimension.scryers) {
-		if (tDimension.scryers.hasOwnProperty(scryerId)) {
-			addScryer(scryerId);
-		}
+
+	var scryerIds = Object.keys(tDimension.scryers);
+
+	for (var i = 0; i < scryerIds.length; i += 1) {
+		addScryer(scryerIds[i]);
 	}
 
 	// And add a listener for more scryers to join the party.
@@ -207,6 +210,10 @@ function handleGoalsDiff(diff) {
 	merging = false;
 }
 
+function handleError(error) {
+	console.error(error);
+}
+
 function register() {
 	// Login as create to get a new scryer.
 	console.log('emitting login:', 'create');
@@ -237,10 +244,6 @@ function contentLoaded() {
 
 	window.scrollTo(0,1);
 
-	if (window.config && window.config.hasOwnProperty('google-analytics')) {
-		require('ga')(window.config['google-analytics']);
-	}
-
 	sm.on('dimension', handleDimensionData);
 	sm.on('dimension.diff', handleDimensionDiff);
 
@@ -250,6 +253,7 @@ function contentLoaded() {
 	sm.on('loggedIn', handleLoggedIn);
 
 	sm.on('scryerError', welcome.showError);
+	sm.on('error', handleError);
 }
 
 // Listen for the page to indicate that it's ready.

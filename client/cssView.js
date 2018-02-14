@@ -26,8 +26,8 @@
 //  \___|___/___/ \_/ |_|\___| \_/\_/
 //
 
-var EventEmitter = require('emitter');
-var inherits = require('inherit');
+var EventEmitter = require('events').EventEmitter;
+var inherits = require('util').inherits;
 var Goal = require('./goal');
 var Portal = require('./portal');
 var Whim = require('./whim');

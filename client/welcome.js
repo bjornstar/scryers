@@ -20,7 +20,7 @@
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-var EventEmitter = require('emitter');
+var EventEmitter = require('events');
 
 exports = module.exports = new EventEmitter();
 

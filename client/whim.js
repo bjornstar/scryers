@@ -20,6 +20,8 @@
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+require('file-loader?name=[name].[ext]!./images/slime.png');
+
 function transform(what, how) {
 	what.style.transform = how;
 	what.style.webkitTransform = how;

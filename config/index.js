@@ -21,8 +21,6 @@
 
 var appConfig = {};
 
-require('tome-log');
-
 try {
 	appConfig = require('../config.json');
 } catch (e) {
