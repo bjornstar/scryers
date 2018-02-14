@@ -18,13 +18,6 @@
 // DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
-//                                      _
-//   ___ __ _ _ ____   ____ _ ___/\   /(_) _____      __
-//  / __/ _` | '_ \ \ / / _` / __\ \ / / |/ _ \ \ /\ / /
-// | (_| (_| | | | \ V / (_| \__ \\ V /| |  __/\ V  V /
-//  \___\__,_|_| |_|\_/ \__,_|___/ \_/ |_|\___| \_/\_/
-//
 
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;

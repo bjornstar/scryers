@@ -104,6 +104,10 @@ div.container {
 	transition: opacity 1s;
 }
 
+.fadein {
+  opacity: 1;
+}
+
 div.nametag {
   position: absolute;
   top: -55px;

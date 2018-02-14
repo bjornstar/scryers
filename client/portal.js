@@ -30,14 +30,6 @@ function transform(what, how) {
 	what.style.mozTransform = how;
 }
 
-function onEnd(what, then) {
-	what.addEventListener('transitionend', then);
-	what.addEventListener('webkitTransitionEnd', then);
-	what.addEventListener('msTransitionEnd', then);
-	what.addEventListener('oTransitionEnd', then);
-	what.addEventListener('mozTransitionEnd', then);
-}
-
 function Portal(portal, view) {
 	this.portal = portal;
 
@@ -45,8 +37,6 @@ function Portal(portal, view) {
 	this.y = portal.y.valueOf();
 
 	var position = 'translate(' + this.x + 'px, ' + this.y + 'px)';
-
-	var name = portal.getParent().name.valueOf();
 
 	var cnt = this.rootElement = document.createElement('div');
 	cnt.className = 'container';
@@ -60,6 +50,7 @@ function Portal(portal, view) {
 
 	// And create the nametag.
 
+	var name = portal.getParent().name.valueOf();
 	var nametag = this.nametag = document.createElement('div');
 	nametag.className = 'nametag';
 	nametag.textContent = name;
@@ -71,25 +62,8 @@ function Portal(portal, view) {
 
 	view.appendChild(cnt);
 
-	var that = this;
-
-	var destroyed = false;
-
-	portal.once('destroy', function () {
-		destroyed = true;
-		that.destroy();
-	});
-
-	function removePortal(e) {
-		// Unfortunately Mozilla is a giant pile of garbage and doesn't
-		// reliably animate anything.
-
-		if (destroyed) {
-			cnt.parentNode.removeChild(cnt);
-		}
-	}
-
-	onEnd(cnt, removePortal);
+	this.destroy = this.destroy.bind(this);
+	portal.once('destroy', this.destroy);
 
 	// We want the portal to fade in. The default opacity of a portal is 0, we
 	// use setTimeout to trigger a transition.
@@ -115,11 +89,14 @@ Portal.prototype.update = function () {
 };
 
 Portal.prototype.destroy = function () {
-	// We fade out the portal by setting the opacity to 0.
 	var cnt = this.rootElement;
+	// We fade out the portal by setting the opacity to 0.
+	cnt.classList.remove('fadein');
 
 	// and when the opacity reaches 0 we remove the portal from the dimension.
-	cnt.style.opacity = 0;
+	setTimeout(function () {
+		cnt.parentNode.removeChild(cnt);
+	}, 1000);
 };
 
 module.exports = Portal;
