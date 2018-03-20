@@ -47,7 +47,7 @@ a {
 .view {
   position: absolute;
   top: 0;
-  bottom: 32px;
+  bottom: 0;
   background-color: #d4f1b3;
   z-index: 1;
   background-image: url('/images/grid-100x100.png');
@@ -146,19 +146,6 @@ li img {
 
 #propTypes, #nameDiv, #audio {
   display: none;
-}
-
-#chat {
-  display: block;
-  border: 0;
-  font-family: sans-serif;
-  font-size: 16px;
-  height: 32px;
-  bottom: 0;
-  position: absolute;
-  width: 100%;
-  padding-left: 4px;
-  z-index: 5;
 }
 
 #propTypes img {

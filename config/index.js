@@ -29,13 +29,19 @@ try {
 
 appConfig.name = require('../package.json').name;
 
-if (appConfig.prettyLog) {
-	var log = console.log;
-	console.log = function () {
-		var args = Array.prototype.slice.call(arguments);
+function prettyLogGenerator(fnLog) {
+	return function () {
+		const args = Array.prototype.slice.call(arguments);
 		args.unshift('[' + new Date().toISOString() + '] ' + appConfig.name + '.' + process.pid + ' -');
-		log.apply(console, args);
+		fnLog.apply(console, args);
 	}
+}
+
+if (appConfig.prettyLog) {
+	const { error, log, warn } = console;
+
+	console.log = prettyLogGenerator(log);
+	console.error = prettyLogGenerator(error);
 }
 
 module.exports = appConfig;

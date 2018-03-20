@@ -20,7 +20,6 @@
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 var EventEmitter = require('events').EventEmitter;
-var inherits = require('util').inherits;
 var raf = require('raf');
 var Tween = require('component-tween');
 var Tome = require('@bjornstar/tomes');
@@ -45,8 +44,6 @@ function update() {
 	for (name in chatTweens) {
 		chatTweens[name].update();
 	}
-
-	console.log(catTweens);
 }
 
 function drawChats(ctx, chats) {
@@ -184,7 +181,7 @@ function updateCat(o) {
 
 function createCatTween(view, cat) {
 	var name = cat.getKey();
-	console.log('creating tween for', name);
+
 	var currentPos = view.cats[name].pos;
 
 	var newPos = cat.pos;
@@ -204,80 +201,91 @@ function createCatTween(view, cat) {
 	catTweens[name] = tween;
 }
 
-function CanvasView(map, ref) {
-	EventEmitter.call(this);
+class CanvasView extends EventEmitter {
+	constructor (map, ref) {
+		super();
 
-	this.id = 'canvasview' + id;
-	this.map = map || { width: 2000, height: 400 };
-	this.ref = ref;
-	this.offset = { x: 0, y: 0 };
-	this.cats = Tome.conjure({});
+		this.id = 'canvasview' + id;
+		this.map = map || { width: 2000, height: 400 };
+		this.ref = ref;
+		this.offset = { x: 0, y: 0 };
+		this.cats = Tome.conjure({});
 
-	var canvas = this.canvas = document.createElement('CANVAS');
-	canvas.className = 'view';
-	canvas.id = this.id;
+		var canvas = this.canvas = document.createElement('CANVAS');
+		canvas.className = 'view';
+		canvas.id = this.id;
 
-	id += 1;
+		id += 1;
 
-	this.halfCanvasW = half(canvas.width);
-	this.halfCanvasH = half(canvas.height);
+		this.halfCanvasW = half(canvas.width);
+		this.halfCanvasH = half(canvas.height);
 
-	document.body.appendChild(canvas);
+		document.body.appendChild(canvas);
 
-	resizeCanvas(this);
+		resizeCanvas(this);
 
-	var that = this;
+		var that = this;
 
-	window.addEventListener('resize', function () {
-		resizeCanvas(that);
-	}, false);
+		window.addEventListener('resize', function () {
+			resizeCanvas(that);
+		}, false);
 
-	canvas.addEventListener('mouseup', function(event) {
-		var eX = event.pageX;
-		var eY = event.pageY;
+		canvas.addEventListener('mouseup', function(event) {
+			if (event.which !== 1) {
+				return;
+			}
 
-		var dX = eX + that.offset.x;
-		var dY = eY + that.offset.y;
+			var eX = event.pageX;
+			var eY = event.pageY;
 
-		var newX = Math.max(Math.min(dX, that.map.width - sprite.width / 2), sprite.width / 2);
-		var newY = Math.max(Math.min(dY, that.map.height - sprite.height / 2 + 6), sprite.width / 2);
+			var dX = eX + that.offset.x;
+			var dY = eY + that.offset.y;
 
-		that.emit('newCoords', newX, newY);
-	});
+			var newX = Math.max(Math.min(dX, that.map.width - sprite.width / 2), sprite.width / 2);
+			var newY = Math.max(Math.min(dY, that.map.height - sprite.height / 2 + 6), sprite.width / 2);
 
-	start(this);
+			that.emit('newCoords', newX, newY);
+		});
+
+		start(this);
+	}
+
+	addPortal(portal) {
+		console.log('addPortal', portal);
+	}
+
+	addGoal(goal) {
+		console.log('addGoal', goal);
+	}
+
+	addCat(cat) {
+		var name = cat.getKey();
+		this.cats.set(name, cat);
+		this.cats[name].pos.set('o', 1);
+
+		loadSprite(cat.catType.valueOf());
+		loadSprite(cat.propType.valueOf());
+
+		var that = this;
+
+		cat.pos.on('readable', function () {
+			createCatTween(that, cat);
+		});
+
+		cat.on('destroy', function () {
+			that.cats.del(name);
+		});
+	}
+
+	setRef(ref) {
+		this.ref = ref;
+
+		var that = this;
+
+		this.ref.pos.on('readable', function () {
+			updateOffset(that);
+		});
+	}
 }
-
-inherits(CanvasView, EventEmitter);
-
-CanvasView.prototype.addCat = function (cat) {
-	var name = cat.getKey();
-	this.cats.set(name, cat);
-	this.cats[name].pos.set('o', 1);
-
-	loadSprite(cat.catType.valueOf());
-	loadSprite(cat.propType.valueOf());
-
-	var that = this;
-
-	cat.pos.on('readable', function () {
-		console.log('readable', JSON.stringify(cat));
-		createCatTween(that, cat);
-	});
-
-	cat.on('destroy', function () {
-		that.cats.del(name);
-	});
-};
-
-CanvasView.prototype.setRef = function (ref) {
-	this.ref = ref;
-
-	var that = this;
-
-	this.ref.pos.on('readable', function () {
-		updateOffset(that);
-	});
-};
 
 exports.CanvasView = CanvasView;

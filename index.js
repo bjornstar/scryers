@@ -28,35 +28,35 @@
 // |_______||_______||___|  |_|  |___|  |_______||___|  |_||_______|
 //
 
-var express = require('express');
-var HtmlWebpackPlugin = require('html-webpack-plugin');
-var path = require('path');
-var Tome = require('@bjornstar/tomes');
-var webpack = require('webpack');
-var webpackDevMiddleware = require('webpack-dev-middleware');
+const express = require('express');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const path = require('path');
+const Tome = require('@bjornstar/tomes');
+const webpack = require('webpack');
+const webpackDevMiddleware = require('webpack-dev-middleware');
 
-var appConfig = require('./config/');
-var move = require('./lib/move');
-var SockMonger = require('./lib/sockmonger');
-var Scryer = require('./lib/scryer');
+const appConfig = require('./config');
+const move = require('./lib/move');
+const SockMonger = require('./lib/sockmonger');
+const Scryer = require('./lib/scryer');
 
-var port = appConfig.port || 3000;
+const port = appConfig.port || 3000;
 
-var tDimension = Tome.conjure({ turn: 0, scryers: {} });
-var tGoals = Tome.conjure({});
+const tDimension = Tome.conjure({ turn: 0, scryers: {} });
+const tGoals = Tome.conjure({});
 
-var newThisTurn = {};
+const newThisTurn = {};
+const loggingIn = {};
 
-var merging;
+let merging = false;
+let nextTurnTimeout = null;
 
 function msToNextTurn() {
 	return Date.now() % appConfig.msPerTurn || 1000;
 }
 
-var nextTurnTimeout;
-
 // This holds all of the whims that need to move.
-var moving = {};
+const moving = {};
 
 function nextTurn() {
 	move(moving);
@@ -73,7 +73,7 @@ function delClient(clientId) {
 }
 
 function mergeGoal(diff) {
-	var clientId = this.id;
+	const clientId = this.id;
 
 	if (!diff) {
 		console.log('empty diff');
@@ -96,14 +96,14 @@ function mergeGoal(diff) {
 }
 
 function newGoalPos() {
-	var scryerId = this.getParent().getKey();
-	var scryer = tDimension.scryers[scryerId];
+	const scryerId = this.getParent().getKey();
+	const scryer = tDimension.scryers[scryerId];
 
-	var whimIds = Object.keys(scryer.whims);
+	const whimIds = Object.keys(scryer.whims);
 
-	for (var i = 0; i < whimIds.length; i += 1) {
-		var whimId = whimIds[i];
-		var whim = scryer.whims[whimId];
+	for (let i = 0; i < whimIds.length; i += 1) {
+		let whimId = whimIds[i];
+		let whim = scryer.whims[whimId];
 
 		moving[whimId] = { pos: whim.pos, goal: this, speed: whim.speed };
 
@@ -117,21 +117,19 @@ function newGoalPos() {
 }
 
 function login(client, scryer) {
-	var clientId = client.id;
-	var scryerId = scryer.data.id;
+	const clientId = client.id;
+	const scryerId = scryer.id;
 
-	var publicData = scryer.data.public;
-
-	var goalData = {
-		pos: publicData.portal
+	const goalData = {
+		pos: scryer.portal
 	};
 
-	// Sneakily bump the lastseen before it gets turned into a tome.
-	publicData.lastlogin = Date.now();
+	// Sneakily bump the lastLogin before it gets turned into a tome.
+	scryer.lastLogin = Date.now();
 
 	// Add the scryer to our scryers tome and all clients will automagically
 	// get updated at the end of this turn.
-	tDimension.scryers.set(scryerId, publicData);
+	tDimension.scryers.set(scryerId, scryer);
 
 	// Add the goal to our goals tome, which gets updated in realtime.
 	tGoals.set(scryerId, goalData);
@@ -141,13 +139,11 @@ function login(client, scryer) {
 	client.once('close', function () {
 		console.log(clientId, 'disconnected. logging out', scryerId, '.');
 
-		tDimension.scryers[scryerId].set('lastlogout', Date.now());
+		tDimension.scryers[scryerId].set('lastLogout', Date.now());
 
-		scryer.save(function(error) {
-			if (error) {
-				console.log('error saving:', scryerId, error)
-			}
-
+		scryer.save().catch(function (error) {
+			console.log('error saving:', scryerId, error)
+		}).then(function () {
 			tDimension.scryers.del(scryerId);
 			tGoals.del(scryerId);
 		});
@@ -158,31 +154,46 @@ function login(client, scryer) {
 }
 
 function handleLogin(scryerId) {
-	var client = this;
-	var clientId = client.id;
+	const client = this;
+	const clientId = client.id;
 
-	// The first thing we do is check to see if that scryer is already logged
+	// The first thing we do is check to see if that scryer is already logging
 	// in.
 
+	if (loggingIn[scryerId]) {
+		console.log(scryerId, 'is already logging in');
+		return client.remoteEmit('scryerError', 'alreadyLoggingIn');
+	}
+
+	loggingIn[scryerId] = true;
+
 	if (tDimension.scryers.hasOwnProperty(scryerId)) {
-		console.log(scryerId, ' is already logged in');
+		console.log(scryerId, 'is already logged in');
 		return client.remoteEmit('scryerError', 'alreadyLoggedIn');
 	}
 
-	var scryer = new Scryer(scryerId);
-
-	scryer.once('ready', function (error) {
+	Scryer.load(scryerId).then(function (scryer) {
 		if (!sm.clients.hasOwnProperty(clientId)) {
 			return console.log('client disconnected before data loaded.', clientId, scryerId);
 		}
 
-		if (error) {
-			console.error('error logging in:', error);
-			return client.remoteEmit('scryerError', error);
+		delete loggingIn[scryerId];
+		login(client, scryer);
+	}).catch(function (error) {
+		if (error.code === 'ENOENT') {
+			console.log(`Unknown scryer: ${scryerId}`);
+			return client.remoteEmit('scryerError', 'scryerNotFound');
 		}
 
-		login(client, scryer);
+		console.log('error logging in:', error);
+		client.remoteEmit('scryerError', error);
 	});
+}
+
+function handleRegister(name) {
+	const scryer = Scryer.create({ name });
+
+	login(this, scryer);
 }
 
 function addClient(clientId) {
@@ -190,13 +201,13 @@ function addClient(clientId) {
 
 	newThisTurn[clientId] = tDimension.getVersion();
 
-	var client = sm.clients[clientId];
+	const client = sm.clients[clientId];
 
 	// On diff, the client sent us a change to their goal.
 	client.on('diff', mergeGoal);
 
-	// On login, the client is trying to login.
 	client.on('login', handleLogin);
+	client.on('register', handleRegister);
 
 	// When a client connects, we send them a copy of the dimension. This is
 	// synchronized once per turn.
@@ -207,7 +218,7 @@ function addClient(clientId) {
 	client.remoteEmit('goals', tGoals);
 }
 
-var webpackOptions = {
+const webpackOptions = {
 	context: path.resolve(__dirname, 'client'),
 	entry: {
 		index: './index.js'
@@ -231,17 +242,13 @@ var webpackOptions = {
 	]
 };
 
-var webpackDevOptions = {
-	index: 'index.html'
-};
-
-var gameExpress = express();
-gameExpress.use(webpackDevMiddleware(webpack(webpackOptions), webpackDevOptions));
+const gameExpress = express();
+gameExpress.use(webpackDevMiddleware(webpack(webpackOptions), {}));
 
 // This starts our express web server listening on either a port or a socket.
-var gameServer = gameExpress.listen(port);
+const gameServer = gameExpress.listen(port);
 
-var sm = new SockMonger({ server: gameServer });
+const sm = new SockMonger({ server: gameServer });
 
 sm.on('add', addClient);
 sm.on('del', delClient);
@@ -254,7 +261,7 @@ function handleGoalsReadable() {
 		return;
 	}
 
-	var diffs = tGoals.readAll();
+	const diffs = tGoals.readAll();
 
 	if (!diffs) {
 		return;
@@ -270,20 +277,21 @@ function sendTurn() {
 		return;
 	}
 
-	var currentVersion = tDimension.getVersion();
+	const currentVersion = tDimension.getVersion();
 
-	var diffs = tDimension.readAll();
+	const diffs = tDimension.readAll();
 
-	var exclude = [];
+	const exclude = [];
 
-	for (var newId in newThisTurn) {
+
+	for (let newId in newThisTurn) {
 		exclude.push(newId);
 
-		var trimmedDiffs = diffs.slice(diffs.length - (currentVersion - newThisTurn[newId]));
+		let trimmedDiffs = diffs.slice(diffs.length - (currentVersion - newThisTurn[newId]));
 		sm.clients[newId].remoteEmit('dimension.diff', trimmedDiffs);
-	}
 
-	newThisTurn = {};
+		delete newThisTurn[newId];
+	}
 
 	sm.broadcast('dimension.diff', diffs, exclude);
 }

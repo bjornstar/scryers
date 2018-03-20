@@ -214,10 +214,8 @@ function handleError(error) {
 	console.error(error);
 }
 
-function register() {
-	// Login as create to get a new scryer.
-	console.log('emitting login:', 'create');
-	sm.remoteEmit('login', 'create');
+function register(name) {
+	sm.remoteEmit('register', name);
 }
 
 function contentLoaded() {

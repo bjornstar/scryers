@@ -18,16 +18,10 @@
 // DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
-//                     _
-//   ___ ___ ___/\   /(_) _____      __
-//  / __/ __/ __\ \ / / |/ _ \ \ /\ / /
-// | (__\__ \__ \\ V /| |  __/\ V  V /
-//  \___|___/___/ \_/ |_|\___| \_/\_/
-//
 
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
+
 var Goal = require('./goal');
 var Portal = require('./portal');
 var Whim = require('./whim');
@@ -69,8 +63,13 @@ function CssView(map, ref) {
 
 	var that = this;
 	view.addEventListener('mouseup', function (event) {
+		if (event.which !== 1) {
+			return;
+		}
+
 		var newX = event.pageX;
 		var newY = event.pageY;
+
 		that.emit('newCoords', newX, newY);
 	});
 
