@@ -223,6 +223,7 @@ const webpackOptions = {
 	entry: {
 		index: './index.js'
 	},
+	mode: 'none',
 	module: {
 		rules: [
 			{
