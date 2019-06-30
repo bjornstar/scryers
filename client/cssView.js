@@ -19,14 +19,14 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-var EventEmitter = require('events').EventEmitter;
-var inherits = require('util').inherits;
+const EventEmitter = require('events').EventEmitter;
+const inherits = require('util').inherits;
 
-var Goal = require('./goal');
-var Portal = require('./portal');
-var Whim = require('./whim');
+const Goal = require('./goal');
+const Portal = require('./portal');
+const Whim = require('./whim');
 
-var id = 0;
+let id = 0;
 
 function CssView(map, ref) {
 	EventEmitter.call(this);

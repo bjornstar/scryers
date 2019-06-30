@@ -24,16 +24,10 @@ require('file-loader?emit=false&name=[name].[ext]!./images/goal.png');
 
 function transform(what, how) {
 	what.style.transform = how;
-	what.style.webkitTransform = how;
-	what.style.msTransform = how;
-	what.style.oTransform = how;
 }
 
 function onEnd(what, then) {
 	what.addEventListener('transitionEnd', then);
-	what.addEventListener('webkitTransitionEnd', then);
-	what.addEventListener('msTransitionEnd', then);
-	what.addEventListener('oTransitionEnd', then);
 }
 
 function Goal(goal, view) {

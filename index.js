@@ -29,7 +29,6 @@
 //
 
 const express = require('express');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
 const path = require('path');
 const Tome = require('@bjornstar/tomes');
 const webpack = require('webpack');
@@ -39,6 +38,8 @@ const appConfig = require('./config');
 const move = require('./lib/move');
 const SockMonger = require('./lib/sockmonger');
 const Scryer = require('./lib/scryer');
+const Whim = require('./lib/whim');
+const webpackOptions = require('./webpack');
 
 const port = appConfig.port || 3000;
 
@@ -55,12 +56,27 @@ function msToNextTurn() {
 	return Date.now() % appConfig.msPerTurn || 1000;
 }
 
+function pickRandom(o) {
+  const keys = Object.keys(o);
+  const randomKey = keys[Math.floor(Math.random() * keys.length)];
+
+  return o[randomKey];
+}
+
 // This holds all of the whims that need to move.
 const moving = {};
+
+function spawn() {
+	if (Math.random() * 10 > 9) {
+		const whim = Whim.create({});
+		pickRandom(tDimension.scryers).whims.set(whim.id, whim);
+	}
+}
 
 function nextTurn() {
 	move(moving);
 
+	spawn();
 	sendTurn();
 
 	nextTurnTimeout = setTimeout(nextTurn, msToNextTurn());
@@ -73,8 +89,6 @@ function delClient(clientId) {
 }
 
 function mergeGoal(diff) {
-	const clientId = this.id;
-
 	if (!diff) {
 		console.log('empty diff');
 		return;
@@ -161,31 +175,31 @@ function handleLogin(scryerId) {
 	// in.
 
 	if (loggingIn[scryerId]) {
-		console.log(scryerId, 'is already logging in');
+		console.error(scryerId, 'is already logging in');
 		return client.remoteEmit('scryerError', 'alreadyLoggingIn');
 	}
 
 	loggingIn[scryerId] = true;
 
 	if (tDimension.scryers.hasOwnProperty(scryerId)) {
-		console.log(scryerId, 'is already logged in');
+		console.error(scryerId, 'is already logged in');
 		return client.remoteEmit('scryerError', 'alreadyLoggedIn');
 	}
 
 	Scryer.load(scryerId).then(function (scryer) {
 		if (!sm.clients.hasOwnProperty(clientId)) {
-			return console.log('client disconnected before data loaded.', clientId, scryerId);
+			return console.error('client disconnected before data loaded.', clientId, scryerId);
 		}
 
 		delete loggingIn[scryerId];
 		login(client, scryer);
 	}).catch(function (error) {
 		if (error.code === 'ENOENT') {
-			console.log(`Unknown scryer: ${scryerId}`);
+			console.error(`Unknown scryer: ${scryerId}`);
 			return client.remoteEmit('scryerError', 'scryerNotFound');
 		}
 
-		console.log('error logging in:', error);
+		console.error('error logging in:', error);
 		client.remoteEmit('scryerError', error);
 	});
 }
@@ -217,31 +231,6 @@ function addClient(clientId) {
 	// is how scryers can influence the dimension.
 	client.remoteEmit('goals', tGoals);
 }
-
-const webpackOptions = {
-	context: path.resolve(__dirname, 'client'),
-	entry: {
-		index: './index.js'
-	},
-	mode: 'none',
-	module: {
-		rules: [
-			{
-				loader: 'file-loader',
-				query: {
-					name: '[path][name].[ext]'
-				},
-				test: /\.(css|html|png)$/
-			}
-		]
-	},
-	plugins: [
-		new HtmlWebpackPlugin({
-			filename: './index.html',
-			template: './index.ejs'
-		})
-	]
-};
 
 const gameExpress = express();
 gameExpress.use(webpackDevMiddleware(webpack(webpackOptions), {}));

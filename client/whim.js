@@ -36,7 +36,7 @@ function onEnd(what, then) {
 	what.addEventListener('oTransitionEnd', then);
 }
 
-function Whim(whim) {
+function Whim(whim, view) {
 	this.whim = whim;
 
 	this.x = whim.pos.x.valueOf();
