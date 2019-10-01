@@ -24,16 +24,10 @@ require('file-loader?name=[name].[ext]!./images/slime.png');
 
 function transform(what, how) {
 	what.style.transform = how;
-	what.style.webkitTransform = how;
-	what.style.msTransform = how;
-	what.style.oTransform = how;
 }
 
 function onEnd(what, then) {
 	what.addEventListener('transitionEnd', then);
-	what.addEventListener('webkitTransitionEnd', then);
-	what.addEventListener('msTransitionEnd', then);
-	what.addEventListener('oTransitionEnd', then);
 }
 
 function Whim(whim, view) {
@@ -49,13 +43,13 @@ function Whim(whim, view) {
 
 	var cnt = this.rootElement = document.createElement('div');
 	cnt.id = whim.getKey();
-	cnt.className = 'whim';
+	cnt.className = 'animated container';
 	transform(cnt, position);
 
 	// Create the whim.
 
 	var div = this.div = document.createElement('div');
-	div.className = whim.class.valueOf();
+	div.className = 'whim';
 	div.style.backgroundImage = 'url(/images/slime.png)';
 	transform(div, direction);
 

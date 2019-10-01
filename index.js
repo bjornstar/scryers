@@ -67,7 +67,7 @@ function pickRandom(o) {
 const moving = {};
 
 function spawn() {
-	if (Math.random() * 10 > 9) {
+	if (Math.random() * 10 > 9 && Object.keys(tDimension.scryers).length) {
 		const whim = Whim.create({});
 		pickRandom(tDimension.scryers).whims.set(whim.id, whim);
 	}

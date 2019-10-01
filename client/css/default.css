@@ -29,7 +29,7 @@ a {
   z-index: 20;
 }
 #Welcome h1 {
-	padding-bottom: 10px;
+  padding-bottom: 10px;
 }
 #blocker {
   background-color: #000;
@@ -52,27 +52,19 @@ a {
   z-index: 1;
   background-image: url('/images/grid-100x100.png');
   display: block;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  -khtml-user-select: none;
-  -moz-user-select: moz-none;
-  -ms-user-select: none;
   user-select: none;
 }
+
+.animated.container {
+  transition: transform 1s linear, opacity 1s;
+}
+
 div.view {
   width:100%;
 }
 
 div.whim {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  -webkit-transition: -webkit-transform 1s linear, opacity 1s;
-  -moz-transition: -moz-transform 1s linear, opacity 1s;
-  -ms-transition: -ms-transform 1s linear, opacity 1s;
-  -o-transition: -o-transform 1s linear, opacity 1s;
-  transition: transform 1s linear, opacity 1s;
+  background-image: url('/images/slime.png');
 }
 
 div.slime {
@@ -84,24 +76,20 @@ div.slime {
   z-index: 2;
 }
 
-div.portal, div.goal {
-	position: absolute;
-	width: 100px;
-	height: 100px;
-	margin-left: -50px;
-	margin-top: -50px;
+div.portal, div.goal, div.whim {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  margin-left: -50px;
+  margin-top: -50px;
 }
 
 div.container {
-	position: absolute;
-	width: 0;
-	height: 0;
-	opacity: 0;
-	-webkit-transition: opacity 1s;
-	-moz-transition: opacity 1s;
-	-ms-transition: opacity 1s;
-	-o-transition: opacity 1s;
-	transition: opacity 1s;
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 1s;
 }
 
 .fadein {
@@ -113,10 +101,7 @@ div.nametag {
   top: -55px;
   font-weight: bold;
   font-size: 8pt;
-  -webkit-transform: translateX(-50%);
-  -moz-transform: translateX(-50%);
-  -ms-transform: translateX(-50%);
-  -o-transform: translateX(-50%);
+  transform: translateX(-50%);
   min-width: 300px;
   text-align: center;
 }
@@ -153,8 +138,8 @@ li img {
   background-repeat: no-repeat;
 }
 
-.c1 img {
-  background-image: url('/images/slime.png');
+div.whim {
+
 }
 
 .c2 img {
@@ -206,5 +191,5 @@ li img {
 }
 
 .debugInfo {
-	position: absolute;
+  position: absolute;
 }
