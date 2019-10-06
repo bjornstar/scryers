@@ -57,25 +57,32 @@ function msToNextTurn() {
 }
 
 function pickRandom(o) {
-  const keys = Object.keys(o);
-  const randomKey = keys[Math.floor(Math.random() * keys.length)];
+	const keys = Object.keys(o);
+	const randomKey = keys[Math.floor(Math.random() * keys.length)];
 
-  return o[randomKey];
+	return o[randomKey];
 }
 
-// This holds all of the whims that need to move.
-const moving = {};
-
 function spawn() {
-	if (Math.random() * 10 > 9 && Object.keys(tDimension.scryers).length) {
+	if (Math.random() * 10 > 9) {
+		const tScryer = pickRandom(tDimension.scryers);
+		if (!tScryer) return;
+
 		const whim = Whim.create({});
-		pickRandom(tDimension.scryers).whims.set(whim.id, whim);
+		tScryer.whims.set(whim.id, whim);
 	}
 }
 
 function nextTurn() {
-	move(moving);
+	Object.keys(tGoals).forEach(scryerId => {
+		const tGoal = tGoals[scryerId];
+		const tScryer = tDimension.scryers[scryerId];
 
+		Object.keys(tScryer.whims).forEach(whimId => {
+			const tWhim = tScryer.whims[whimId];
+			move(tWhim.pos, tGoal.pos, tWhim.speed);
+		});
+	});
 	spawn();
 	sendTurn();
 
@@ -90,7 +97,6 @@ function delClient(clientId) {
 
 function mergeGoal(diff) {
 	if (!diff) {
-		console.log('empty diff');
 		return;
 	}
 
@@ -107,27 +113,6 @@ function mergeGoal(diff) {
 	// We can simply broadcast the diff which sends it to all clients except
 	// for the one that sent it.
 	this.broadcast('goals.diff', diff);
-}
-
-function newGoalPos() {
-	const scryerId = this.getParent().getKey();
-	const scryer = tDimension.scryers[scryerId];
-
-	const whimIds = Object.keys(scryer.whims);
-
-	for (let i = 0; i < whimIds.length; i += 1) {
-		let whimId = whimIds[i];
-		let whim = scryer.whims[whimId];
-
-		moving[whimId] = { pos: whim.pos, goal: this, speed: whim.speed };
-
-		// If our whim gets deleted while it's moving, we need to remove it
-		// from the moving list.
-
-		whim.on('destroy', function () {
-			delete moving[whimId];
-		});
-	}
 }
 
 function login(client, scryer) {
@@ -147,8 +132,6 @@ function login(client, scryer) {
 
 	// Add the goal to our goals tome, which gets updated in realtime.
 	tGoals.set(scryerId, goalData);
-
-	tGoals[scryerId].pos.on('readable', newGoalPos);
 
 	client.once('close', function () {
 		console.log(clientId, 'disconnected. logging out', scryerId, '.');

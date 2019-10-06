@@ -190,7 +190,7 @@ function handleDimensionDiff(diff) {
 	// The server sends us updates to our dimension. We cannot affect the
 	// dimension directly, we communiate our desires through our handle in the
 	// goals Tome
-	console.log('got dimension diff:', diff);
+
 	// We merge the diff into our dimension.
 	tDimension.merge(diff);
 
