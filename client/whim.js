@@ -22,94 +22,82 @@
 
 require('file-loader?name=[name].[ext]!./images/slime.png');
 
-function transform(what, how) {
-	what.style.transform = how;
+function scaleX(pos) {
+	return `scaleX(${pos.d == 'l' ? -1 : 1})`;
 }
 
-function onEnd(what, then) {
-	what.addEventListener('transitionEnd', then);
+function translate(pos) {
+	return `translate(${pos.x}px, ${pos.y}px)`;
 }
 
 function Whim(whim, view) {
+	this.div = document.createElement('div');
+	this.nametag = document.createElement('div');
+	this.rootElement = document.createElement('div');
+
 	this.whim = whim;
 
-	this.x = whim.pos.x.valueOf();
-	this.y = whim.pos.y.valueOf();
+	var that = this;
 
-	var position = 'translate(' + this.x + 'px, ' + this.y + 'px)';
-	var direction = 'scaleX(' + (whim.pos.d == 'l' ? -1 : 1) + ')';
+	const { div, nametag, rootElement } = this;
 
-	var name = whim.name.valueOf();
-
-	var cnt = this.rootElement = document.createElement('div');
-	cnt.id = whim.getKey();
-	cnt.className = 'animated container';
-	transform(cnt, position);
+	rootElement.id = whim.getKey();
+	rootElement.className = 'animated container';
+	rootElement.style.transform = translate(whim.pos);
 
 	// Create the whim.
 
-	var div = this.div = document.createElement('div');
 	div.className = 'whim';
 	div.style.backgroundImage = 'url(/images/slime.png)';
-	transform(div, direction);
+	div.style.transform = scaleX(whim.pos);
 
 	// And create the nametag.
 
-	var nametag = this.nametag = document.createElement('div');
 	nametag.className = 'nametag';
-	nametag.textContent = name;
+	nametag.textContent = whim.name.valueOf();
 
 	// Stick them all into the 'whim'
 
-	cnt.appendChild(div);
-	cnt.appendChild(nametag);
+	rootElement.appendChild(div);
+	rootElement.appendChild(nametag);
 
-	view.appendChild(cnt);
+	view.appendChild(rootElement);
 
 	// We want the whim to fade in. The default opacity of a whim is 0, we
 	// use setTimeout to trigger a transition.
 
 	setTimeout(function () {
-		cnt.style.opacity = 1;
+		rootElement.style.opacity = 1;
 	}, 0);
-
-	var that = this;
 
 	whim.pos.on('readable', function () {
 		that.update();
 	});
 
-	whim.on('destroy', function () {
+	whim.once('destroy', function () {
 		that.destroy();
 	});
 }
 
 Whim.prototype.update = function () {
-	var x = this.whim.pos.x.valueOf();
-	var y = this.whim.pos.y.valueOf();
-	var d = this.whim.pos.d.valueOf();
-
-	var movement = 'translate(' + x + 'px, ' + y + 'px)';
-	var direction = 'scaleX(' + (d === 'l' ? -1 : 1) + ')';
+	const { div, rootElement, whim: { pos } } = this;
 
 	// We apply movement transforms to the whole whim so that everything moves
 	// together.
 
-	transform(this.rootElement, movement);
+	rootElement.style.transform = translate(pos);
 
 	// We want to be able to flip the whim left and right, but not the text
 	// so we only apply the direction changes to the whim.
 
-	transform(this.div, direction);
-
-	this.x = x;
-	this.y = y;
+	div.style.transform = scaleX(pos);
 };
 
 Whim.prototype.destroy = function () {
 	// We fade out the whim by setting the opacity to 0.
-	var cnt = this.rootElement;
-	cnt.style.opacity = 0;
+	const { rootElement } = this;
+
+	rootElement.style.opacity = 0;
 
 	function removeWhim(e) {
 		// We might have multiple transitions, the one we want to pay attention
@@ -119,14 +107,13 @@ Whim.prototype.destroy = function () {
 			return;
 		}
 
-		var view = cnt.parentNode;
-		view.removeChild(cnt);
+		rootElement.parentNode.removeChild(rootElement);
 
 		e.stopPropagation();
 	}
 
 	// and when the opacity reaches 0 we remove the whim from the playground.
-	onEnd(cnt, removeWhim);
+	rootElement.addEventListener('transitionEnd', removeWhim);
 };
 
 module.exports = Whim;
