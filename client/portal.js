@@ -22,81 +22,58 @@
 
 require('file-loader?emit=false&name=[name].[ext]!./images/portal.png');
 
-function transform(what, how) {
-	what.style.transform = how;
-	what.style.webkitTransform = how;
-	what.style.msTransform = how;
-	what.style.oTransform = how;
-	what.style.mozTransform = how;
+const translate = require('./translate');
+
+class Portal {
+	constructor(portal, view) {
+		this.div = document.createElement('div');
+		this.nametag = document.createElement('div');
+		this.rootElement = document.createElement('div');
+
+		this.portal = portal;
+
+		const { div, nametag, rootElement } = this;
+
+		rootElement.className = 'container';
+		rootElement.style.transform = translate(portal);
+
+		div.className = 'portal'
+		div.style.backgroundImage = 'url(/images/portal.png)';
+
+		nametag.className = 'nametag';
+		nametag.textContent = portal.getParent().name.valueOf();;
+
+		rootElement.appendChild(div);
+		rootElement.appendChild(nametag);
+
+		view.appendChild(rootElement);
+
+		portal.once('destroy', this.destroy.bind(this));
+
+		setTimeout(function () {
+			rootElement.style.opacity = 1;
+		}, 0);
+	}
+
+	update() {
+		const { portal, rootElement } = this;
+
+		rootElement.style.transform = translate(portal);
+	}
+
+	destroy() {
+		const { rootElement } = this;
+
+		rootElement.addEventListener('transitionend', (e) => {
+			if (e.propertyName === 'opacity') {
+				rootElement.parentNode.removeChild(rootElement);
+
+				e.stopPropagation();
+			}
+		});
+
+		rootElement.style.opacity = 0;
+	}
 }
-
-function Portal(portal, view) {
-	this.portal = portal;
-
-	this.x = portal.x.valueOf();
-	this.y = portal.y.valueOf();
-
-	var position = 'translate(' + this.x + 'px, ' + this.y + 'px)';
-
-	var cnt = this.rootElement = document.createElement('div');
-	cnt.className = 'container';
-	transform(cnt, position);
-
-	// Create the portal.
-
-	var div = this.div = document.createElement('div');
-	div.className = 'portal'
-	div.style.backgroundImage = 'url(/images/portal.png)';
-
-	// And create the nametag.
-
-	var name = portal.getParent().name.valueOf();
-	var nametag = this.nametag = document.createElement('div');
-	nametag.className = 'nametag';
-	nametag.textContent = name;
-
-	// Stick them all into the 'portal'
-
-	cnt.appendChild(div);
-	cnt.appendChild(nametag);
-
-	view.appendChild(cnt);
-
-	this.destroy = this.destroy.bind(this);
-	portal.once('destroy', this.destroy);
-
-	// We want the portal to fade in. The default opacity of a portal is 0, we
-	// use setTimeout to trigger a transition.
-
-	setTimeout(function () {
-		cnt.style.opacity = 1;
-	}, 0);
-}
-
-Portal.prototype.update = function () {
-	var x = this.portal.x.valueOf();
-	var y = this.portal.y.valueOf();
-
-	var movement = 'translate(' + x + 'px, ' + y + 'px)';
-
-	// We apply movement transforms to the whole portal so that everything moves
-	// together.
-
-	transform(this.rootElement, movement);
-
-	this.x = x;
-	this.y = y;
-};
-
-Portal.prototype.destroy = function () {
-	var cnt = this.rootElement;
-	// We fade out the portal by setting the opacity to 0.
-	cnt.classList.remove('fadein');
-
-	// and when the opacity reaches 0 we remove the portal from the dimension.
-	setTimeout(function () {
-		cnt.parentNode.removeChild(cnt);
-	}, 1000);
-};
 
 module.exports = Portal;

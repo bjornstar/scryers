@@ -22,90 +22,55 @@
 
 require('file-loader?emit=false&name=[name].[ext]!./images/goal.png');
 
-function transform(what, how) {
-	what.style.transform = how;
-}
+const translate = require('./translate');
 
-function onEnd(what, then) {
-	what.addEventListener('transitionEnd', then);
-}
+class Goal {
+	constructor(goal, view) {
+		this.div = document.createElement('div');
+		this.rootElement = document.createElement('div');
 
-function Goal(goal, view) {
-	this.goal = goal;
+		this.goal = goal;
 
-	this.x = goal.pos.x.valueOf();
-	this.y = goal.pos.y.valueOf();
+		const { div, rootElement } = this;
 
-	var position = 'translate(' + this.x + 'px, ' + this.y + 'px)';
+		rootElement.id = goal.getKey();
+		rootElement.className = 'container';
+		rootElement.style.transform = translate(goal.pos);
 
-	var cnt = this.rootElement = document.createElement('div');
-	cnt.id = goal.getKey();
-	cnt.className = 'container';
-	transform(cnt, position);
+		div.className = 'goal'
+		div.style.backgroundImage = 'url(/images/goal.png)';
 
-	// Create the goal.
+		rootElement.appendChild(div);
 
-	var div = this.div = document.createElement('div');
-	div.className = 'goal'
-	div.style.backgroundImage = 'url(/images/goal.png)';
+		view.appendChild(rootElement);
 
-	// Stick them all into the container
+		goal.on('destroy', this.destroy.bind(this));
+		goal.pos.on('readable', this.update.bind(this));
 
-	cnt.appendChild(div);
-
-	// We want the goal to fade in. The default opacity of a goal is 0, we
-	// use setTimeout to trigger a transition.
-
-	setTimeout(function () {
-		cnt.style.opacity = 1;
-	}, 0);
-
-	view.appendChild(cnt);
-
-	var that = this;
-
-	goal.pos.on('readable', function () {
-		that.update();
-	});
-
-	goal.on('destroy', function () {
-		that.destroy();
-	});
-}
-
-Goal.prototype.update = function () {
-	var x = this.goal.pos.x.valueOf();
-	var y = this.goal.pos.y.valueOf();
-
-	var movement = 'translate(' + x + 'px, ' + y + 'px)';
-
-	// We apply movement transforms to the whole goal so that everything moves
-	// together.
-
-	transform(this.rootElement, movement);
-
-	this.x = x;
-	this.y = y;
-};
-
-Goal.prototype.destroy = function () {
-	// We fade out the goal by setting the opacity to 0.
-	var cnt = this.rootElement;
-
-	function removeGoal(e) {
-		// We might have multiple transitions, the one we want to pay attention
-		// to is the one for opacity.
-
-		if (e.propertyName === 'opacity') {
-			cnt.parentNode.removeChild(cnt);
-		}
+		setTimeout(function () {
+			rootElement.style.opacity = 1;
+		}, 0);
 	}
 
-	// and when the opacity reaches 0 we remove the goal from the dimension.
+	update() {
+		const { goal: { pos }, rootElement } = this;
 
-	onEnd(cnt, removeGoal);
+		rootElement.style.transform = translate(pos);
+	}
 
-	cnt.style.opacity = 0;
-};
+	destroy() {
+		console.log('goal.destroy');
+		const { rootElement } = this;
+
+		rootElement.addEventListener('transitionend', (e) => {
+			if (e.propertyName === 'opacity') {
+				rootElement.parentNode.removeChild(rootElement);
+				e.stopPropagation();
+			}
+		});
+
+		rootElement.style.opacity = 0;
+	}
+}
 
 module.exports = Goal;
