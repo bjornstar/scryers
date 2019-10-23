@@ -59,7 +59,6 @@ class Goal {
 	}
 
 	destroy() {
-		console.log('goal.destroy');
 		const { rootElement } = this;
 
 		rootElement.addEventListener('transitionend', (e) => {

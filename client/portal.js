@@ -35,7 +35,7 @@ class Portal {
 		const { div, nametag, rootElement } = this;
 
 		rootElement.className = 'container';
-		rootElement.style.transform = translate(portal);
+		rootElement.style.transform = translate(portal.pos);
 
 		div.className = 'portal'
 		div.style.backgroundImage = 'url(/images/portal.png)';
@@ -58,7 +58,7 @@ class Portal {
 	update() {
 		const { portal, rootElement } = this;
 
-		rootElement.style.transform = translate(portal);
+		rootElement.style.transform = translate(portal.pos);
 	}
 
 	destroy() {

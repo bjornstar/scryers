@@ -120,7 +120,7 @@ function login(client, scryer) {
 	const scryerId = scryer.id;
 
 	const goalData = {
-		pos: scryer.portal
+		pos: scryer.portal.pos
 	};
 
 	// Sneakily bump the lastLogin before it gets turned into a tome.

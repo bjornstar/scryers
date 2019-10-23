@@ -92,10 +92,6 @@ div.container {
   transition: opacity 1s;
 }
 
-.fadein {
-  opacity: 1;
-}
-
 div.nametag {
   position: absolute;
   top: -55px;
@@ -120,74 +116,6 @@ li {
 li img {
   padding-left: 8px;
   padding-bottom: 6px;
-}
-
-#catTypes img:hover, #propTypes img:hover{
-  background-color: #d4f1b3;
-  box-shadow: inset 3px 3px 10px #bd9;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-#propTypes, #nameDiv, #audio {
-  display: none;
-}
-
-#propTypes img {
-  background-position: 8px 0px;
-  background-repeat: no-repeat;
-}
-
-div.whim {
-
-}
-
-.c2 img {
-  background-image: url('/images/slime.png');
-}
-
-.c3 img {
-  background-image: url('/images/slime.png');
-}
-
-.c4 img {
-  background-image: url('/images/slime.png');
-}
-
-.c5 img {
-  background-image: url('/images/slime.png');
-}
-
-.c6 img {
-  background-image: url('/images/slime.png');
-}
-
-.c7 img {
-  background-image: url('/images/slime.png');
-}
-
-.c8 img {
-  background-image: url('/images/slime.png');
-}
-
-.c9 img {
-  background-image: url('/images/slime.png');
-}
-
-.c10 img {
-  background-image: url('/images/slime.png');
-}
-
-#yourCat {
-  height: 100px;
-  width: 91px;
-}
-
-#startOver {
-  position: relative;
-  text-align: right;
-  margin-right: 10px;
-  cursor: pointer;
 }
 
 .debugInfo {
