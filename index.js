@@ -29,7 +29,6 @@
 //
 
 const express = require('express');
-const path = require('path');
 const Tome = require('@bjornstar/tomes');
 const webpack = require('webpack');
 const webpackDevMiddleware = require('webpack-dev-middleware');

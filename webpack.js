@@ -1,5 +1,6 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const path = require('path');
+const { SourceMapDevToolPlugin } = require('webpack');
 
 const webpackOptions = {
 	context: path.resolve(__dirname, 'client'),
@@ -11,18 +12,19 @@ const webpackOptions = {
 		rules: [
 			{
 				loader: 'file-loader',
-				query: {
-					name: '[path][name].[ext]'
-				},
+				options: {
+          name: '[path][name].[ext]'
+        },
 				test: /\.(css|html|png)$/
-			}
+			},
 		]
 	},
 	plugins: [
 		new HtmlWebpackPlugin({
 			filename: './index.html',
 			template: './index.ejs'
-		})
+		}),
+		new SourceMapDevToolPlugin({})
 	]
 };
 

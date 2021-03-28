@@ -38,7 +38,7 @@ function prettyLogGenerator(fnLog) {
 }
 
 if (appConfig.prettyLog) {
-	const { error, log, warn } = console;
+	const { error, log } = console;
 
 	console.log = prettyLogGenerator(log);
 	console.error = prettyLogGenerator(error);

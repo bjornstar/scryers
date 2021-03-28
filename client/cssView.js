@@ -19,8 +19,7 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-const EventEmitter = require('events').EventEmitter;
-const inherits = require('util').inherits;
+const { EventEmitter } = require('events');
 
 const Goal = require('./goal');
 const Portal = require('./portal');
@@ -28,76 +27,69 @@ const Whim = require('./whim');
 
 let id = 0;
 
-function CssView(map, ref) {
-	EventEmitter.call(this);
+class CssView extends EventEmitter {
+	constructor(map, ref) {
+		super();
 
-	this.id = 'cssview' + id;
-	this.map = map;
-	this.ref = ref;
-	this.offset = { x: 0, y: 0 };
+		this.id = 'cssview' + id;
+		this.map = map;
+		this.ref = ref;
+		this.offset = { x: 0, y: 0 };
 
-	var debugInfo = document.createElement('DIV');
-	debugInfo.className = 'debugInfo';
+		var debugInfo = document.createElement('DIV');
+		debugInfo.className = 'debugInfo';
 
-	var offsetSpan = document.createElement('SPAN');
-	offsetSpan.textContent = 'x: ' + this.offset.x + ', y: ' + this.offset.y;
+		var offsetSpan = document.createElement('SPAN');
+		offsetSpan.textContent = 'x: ' + this.offset.x + ', y: ' + this.offset.y;
 
-	var mouseSpan = document.createElement('SPAN');
-	var lineBreak = document.createElement('BR');
+		var mouseSpan = document.createElement('SPAN');
+		var lineBreak = document.createElement('BR');
 
-	debugInfo.appendChild(offsetSpan);
-	debugInfo.appendChild(lineBreak);
-	debugInfo.appendChild(mouseSpan);
+		debugInfo.appendChild(offsetSpan);
+		debugInfo.appendChild(lineBreak);
+		debugInfo.appendChild(mouseSpan);
 
-	var view = this.view = document.createElement('DIV');
-	view.className = 'view';
-	view.id = this.id;
+		var view = this.view = document.createElement('DIV');
+		view.className = 'view';
+		view.id = this.id;
 
-	view.appendChild(debugInfo);
+		view.appendChild(debugInfo);
 
-	id += 1;
+		id += 1;
 
-	if (!document.getElementById(view.id)) {
-		document.body.appendChild(view);
-	}
-
-	var that = this;
-	view.addEventListener('mouseup', function (event) {
-		if (event.which !== 1) {
-			return;
+		if (!document.getElementById(view.id)) {
+			document.body.appendChild(view);
 		}
 
-		var newX = event.pageX;
-		var newY = event.pageY;
+		var that = this;
+		view.addEventListener('mouseup', ({ pageX, pageY, which }) => {
+			if (which === 1) that.emit('newCoords', pageX, pageY);
+		});
 
-		that.emit('newCoords', newX, newY);
-	});
+		view.addEventListener('mousemove', ({ pageX, pageY }) => {
+			mouseSpan.textContent = `x: ${pageX}, y: ${pageY}`;
+		});
+	}
 
-	view.addEventListener('mousemove', function (event) {
-		mouseSpan.textContent = 'x: ' + event.pageX + ', y: ' + event.pageY;
-	});
+	addGoal(goal) {
+		new Goal(goal, this.view);
+	}
+
+	addPortal(portal) {
+		new Portal(portal, this.view);
+	}
+
+	addWhim(whim) {
+		new Whim(whim, this.view);
+	}
+
+	remove(element) {
+		this.view.removeChild(element);
+	}
+
+	setRef(ref) {
+		this.ref = ref;
+	}
 }
-
-inherits(CssView, EventEmitter);
-
-CssView.prototype.addWhim = function (whim) {
-	var myWhim = new Whim(whim, this.view);
-};
-
-CssView.prototype.addPortal = function (portal) {
-	var myPortal = new Portal(portal, this.view);
-};
-
-CssView.prototype.addGoal = function (goal) {
-	var myGoal = new Goal(goal, this.view);
-};
-
-CssView.prototype.remove = function (element) {
-	this.view.removeChild(element);
-};
-
-CssView.prototype.setRef = function (ref) {
-	this.ref = ref;
-};
 
 exports.CssView = CssView;
